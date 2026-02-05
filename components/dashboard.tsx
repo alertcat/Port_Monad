@@ -1,8 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
-import { Badge } from "./ui/badge"
 import { Anchor, Trophy, TrendingUp, Zap, ScrollText, BookOpen, Pickaxe, TreePine, Fish } from "lucide-react"
 
 interface Agent {
@@ -39,8 +37,6 @@ export function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // In production, these would be actual API calls
-        // For now, using mock data to demonstrate the UI
         setWorldState({
           tick: 142,
           agent_count: 8,
@@ -78,7 +74,7 @@ export function Dashboard() {
       forest: "bg-green-700",
       market: "bg-purple-700"
     }
-    return colors[region] || "bg-muted"
+    return colors[region] || "bg-slate-600"
   }
 
   const getRankStyle = (rank: number) => {
@@ -92,210 +88,184 @@ export function Dashboard() {
     <div className="min-h-screen">
       <div className="mx-auto max-w-7xl px-4 py-6">
         {/* Header */}
-        <header className="mb-8 border-b border-primary/30 pb-6 text-center">
-          <h1 className="flex items-center justify-center gap-3 text-4xl font-bold text-primary">
+        <header className="mb-8 border-b border-blue-500/30 pb-6 text-center">
+          <h1 className="flex items-center justify-center gap-3 text-4xl font-bold text-blue-400">
             <Anchor className="h-10 w-10" />
             Port Monad
           </h1>
-          <p className="mt-2 text-muted-foreground">
+          <p className="mt-2 text-slate-400">
             Token-gated Persistent World for AI Agents on Monad
           </p>
         </header>
 
         {/* Status Bar */}
         <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <Card className="bg-card/50 backdrop-blur">
-            <CardContent className="p-4 text-center">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Current Tick</p>
-              <p className="mt-1 text-3xl font-bold text-primary">{worldState?.tick ?? "-"}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card/50 backdrop-blur">
-            <CardContent className="p-4 text-center">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Active Agents</p>
-              <p className="mt-1 text-3xl font-bold text-primary">{worldState?.agent_count ?? "-"}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card/50 backdrop-blur">
-            <CardContent className="p-4 text-center">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Tax Rate</p>
-              <p className="mt-1 text-3xl font-bold text-primary">
-                {worldState ? `${(worldState.tax_rate * 100).toFixed(0)}%` : "-"}
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card/50 backdrop-blur">
-            <CardContent className="p-4 text-center">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Last Update</p>
-              <p className="mt-1 text-lg font-bold text-primary">{lastUpdate}</p>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl bg-slate-800/50 p-4 text-center backdrop-blur">
+            <p className="text-xs uppercase tracking-wider text-slate-400">Current Tick</p>
+            <p className="mt-1 text-3xl font-bold text-blue-400">{worldState?.tick ?? "-"}</p>
+          </div>
+          <div className="rounded-xl bg-slate-800/50 p-4 text-center backdrop-blur">
+            <p className="text-xs uppercase tracking-wider text-slate-400">Active Agents</p>
+            <p className="mt-1 text-3xl font-bold text-blue-400">{worldState?.agent_count ?? "-"}</p>
+          </div>
+          <div className="rounded-xl bg-slate-800/50 p-4 text-center backdrop-blur">
+            <p className="text-xs uppercase tracking-wider text-slate-400">Tax Rate</p>
+            <p className="mt-1 text-3xl font-bold text-blue-400">
+              {worldState ? `${(worldState.tax_rate * 100).toFixed(0)}%` : "-"}
+            </p>
+          </div>
+          <div className="rounded-xl bg-slate-800/50 p-4 text-center backdrop-blur">
+            <p className="text-xs uppercase tracking-wider text-slate-400">Last Update</p>
+            <p className="mt-1 text-lg font-bold text-blue-400">{lastUpdate}</p>
+          </div>
         </div>
 
         {/* Main Grid */}
         <div className="mb-8 grid gap-6 lg:grid-cols-2">
           {/* Leaderboard */}
-          <Card className="bg-card/50 backdrop-blur">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-primary">
-                <Trophy className="h-5 w-5" />
-                Leaderboard
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
-                </div>
-              ) : agents.length > 0 ? (
-                <div className="space-y-3">
-                  {agents.map((agent, index) => {
-                    const rank = index + 1
-                    const totalItems = Object.values(agent.inventory).reduce((a, b) => a + b, 0)
-                    return (
-                      <div
-                        key={agent.name}
-                        className={`flex items-center gap-4 rounded-lg bg-card/50 p-4 transition-colors hover:bg-primary/10 ${getRankStyle(rank)}`}
-                      >
-                        <span className="w-10 text-center text-xl font-bold text-primary">#{rank}</span>
-                        <div className="flex-1">
-                          <p className="font-semibold text-foreground">{agent.name}</p>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                            <Badge className={`${getRegionColor(agent.region)} text-xs`}>{agent.region}</Badge>
-                            <span>AP: {agent.energy}/100</span>
-                            <span>{totalItems} items</span>
-                            <span>Rep: {agent.reputation}</span>
-                          </div>
+          <div className="rounded-xl bg-slate-800/50 p-6 backdrop-blur">
+            <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-blue-400">
+              <Trophy className="h-5 w-5" />
+              Leaderboard
+            </h2>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-400/20 border-t-blue-400" />
+              </div>
+            ) : agents.length > 0 ? (
+              <div className="space-y-3">
+                {agents.map((agent, index) => {
+                  const rank = index + 1
+                  const totalItems = Object.values(agent.inventory).reduce((a, b) => a + b, 0)
+                  return (
+                    <div
+                      key={agent.name}
+                      className={`flex items-center gap-4 rounded-lg bg-slate-700/50 p-4 transition-colors hover:bg-blue-500/10 ${getRankStyle(rank)}`}
+                    >
+                      <span className="w-10 text-center text-xl font-bold text-blue-400">#{rank}</span>
+                      <div className="flex-1">
+                        <p className="font-semibold text-slate-100">{agent.name}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-400">
+                          <span className={`${getRegionColor(agent.region)} rounded px-2 py-0.5 text-xs text-white`}>
+                            {agent.region}
+                          </span>
+                          <span>AP: {agent.energy}/100</span>
+                          <span>{totalItems} items</span>
+                          <span>Rep: {agent.reputation}</span>
                         </div>
-                        <span className="text-xl font-bold text-green-500">{agent.credits}c</span>
                       </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <p className="py-8 text-center text-muted-foreground">No agents registered yet</p>
-              )}
-            </CardContent>
-          </Card>
+                      <span className="text-xl font-bold text-green-400">{agent.credits}c</span>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="py-8 text-center text-slate-400">No agents registered yet</p>
+            )}
+          </div>
 
           {/* Market Prices */}
-          <Card className="bg-card/50 backdrop-blur">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-primary">
-                <TrendingUp className="h-5 w-5" />
-                Market Prices
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="rounded-lg bg-card/50 p-4 text-center">
-                  <Pickaxe className="mx-auto h-8 w-8 text-slate-400" />
-                  <p className="mt-2 text-xs uppercase tracking-wider text-muted-foreground">Iron</p>
-                  <p className="mt-1 text-2xl font-bold text-green-500">{worldState?.market_prices.iron ?? "-"}c</p>
-                </div>
-                <div className="rounded-lg bg-card/50 p-4 text-center">
-                  <TreePine className="mx-auto h-8 w-8 text-amber-600" />
-                  <p className="mt-2 text-xs uppercase tracking-wider text-muted-foreground">Wood</p>
-                  <p className="mt-1 text-2xl font-bold text-green-500">{worldState?.market_prices.wood ?? "-"}c</p>
-                </div>
-                <div className="rounded-lg bg-card/50 p-4 text-center">
-                  <Fish className="mx-auto h-8 w-8 text-blue-400" />
-                  <p className="mt-2 text-xs uppercase tracking-wider text-muted-foreground">Fish</p>
-                  <p className="mt-1 text-2xl font-bold text-green-500">{worldState?.market_prices.fish ?? "-"}c</p>
-                </div>
+          <div className="rounded-xl bg-slate-800/50 p-6 backdrop-blur">
+            <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-blue-400">
+              <TrendingUp className="h-5 w-5" />
+              Market Prices
+            </h2>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="rounded-lg bg-slate-700/50 p-4 text-center">
+                <Pickaxe className="mx-auto h-8 w-8 text-slate-400" />
+                <p className="mt-2 text-xs uppercase tracking-wider text-slate-400">Iron</p>
+                <p className="mt-1 text-2xl font-bold text-green-400">{worldState?.market_prices.iron ?? "-"}c</p>
               </div>
-            </CardContent>
-          </Card>
+              <div className="rounded-lg bg-slate-700/50 p-4 text-center">
+                <TreePine className="mx-auto h-8 w-8 text-amber-500" />
+                <p className="mt-2 text-xs uppercase tracking-wider text-slate-400">Wood</p>
+                <p className="mt-1 text-2xl font-bold text-green-400">{worldState?.market_prices.wood ?? "-"}c</p>
+              </div>
+              <div className="rounded-lg bg-slate-700/50 p-4 text-center">
+                <Fish className="mx-auto h-8 w-8 text-blue-400" />
+                <p className="mt-2 text-xs uppercase tracking-wider text-slate-400">Fish</p>
+                <p className="mt-1 text-2xl font-bold text-green-400">{worldState?.market_prices.fish ?? "-"}c</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Events and Actions */}
         <div className="mb-8 grid gap-6 lg:grid-cols-2">
           {/* Active Events */}
-          <Card className="bg-card/50 backdrop-blur">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-primary">
-                <Zap className="h-5 w-5" />
-                Active Events
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {worldState?.active_events && worldState.active_events.length > 0 ? (
-                <div className="space-y-3">
-                  {worldState.active_events.map((event, index) => (
-                    <div
-                      key={index}
-                      className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4"
-                    >
-                      <p className="font-bold uppercase text-yellow-500">{event.type}</p>
-                      <p className="mt-1 text-muted-foreground">{event.description}</p>
-                      <p className="mt-2 text-sm text-muted-foreground">{event.remaining} ticks remaining</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="py-8 text-center text-muted-foreground">No active events</p>
-              )}
-            </CardContent>
-          </Card>
+          <div className="rounded-xl bg-slate-800/50 p-6 backdrop-blur">
+            <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-blue-400">
+              <Zap className="h-5 w-5" />
+              Active Events
+            </h2>
+            {worldState?.active_events && worldState.active_events.length > 0 ? (
+              <div className="space-y-3">
+                {worldState.active_events.map((event, index) => (
+                  <div
+                    key={index}
+                    className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4"
+                  >
+                    <p className="font-bold uppercase text-yellow-400">{event.type}</p>
+                    <p className="mt-1 text-slate-300">{event.description}</p>
+                    <p className="mt-2 text-sm text-slate-400">{event.remaining} ticks remaining</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="py-8 text-center text-slate-400">No active events</p>
+            )}
+          </div>
 
           {/* Recent Actions */}
-          <Card className="bg-card/50 backdrop-blur">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-primary">
-                <ScrollText className="h-5 w-5" />
-                Recent Actions
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="py-8 text-center text-muted-foreground">Waiting for actions...</p>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl bg-slate-800/50 p-6 backdrop-blur">
+            <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-blue-400">
+              <ScrollText className="h-5 w-5" />
+              Recent Actions
+            </h2>
+            <p className="py-8 text-center text-slate-400">Waiting for actions...</p>
+          </div>
         </div>
 
         {/* Actions Guide */}
-        <Card className="bg-card/50 backdrop-blur">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-primary">
-              <BookOpen className="h-5 w-5" />
-              Available Actions
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="rounded-lg bg-card/50 p-4">
-                <p className="font-bold text-primary">move <span className="font-normal text-muted-foreground">(5 AP)</span></p>
-                <p className="mt-1 text-sm text-muted-foreground">Move to: dock, mine, forest, market</p>
-              </div>
-              <div className="rounded-lg bg-card/50 p-4">
-                <p className="font-bold text-primary">harvest <span className="font-normal text-muted-foreground">(10 AP)</span></p>
-                <p className="mt-1 text-sm text-muted-foreground">Collect resources at current location</p>
-              </div>
-              <div className="rounded-lg bg-card/50 p-4">
-                <p className="font-bold text-primary">place_order <span className="font-normal text-muted-foreground">(3 AP)</span></p>
-                <p className="mt-1 text-sm text-muted-foreground">Buy/sell at market</p>
-              </div>
-              <div className="rounded-lg bg-card/50 p-4">
-                <p className="font-bold text-destructive">raid <span className="font-normal text-muted-foreground">(25 AP)</span></p>
-                <p className="mt-1 text-sm text-muted-foreground">Attack agent to steal credits</p>
-              </div>
-              <div className="rounded-lg bg-card/50 p-4">
-                <p className="font-bold text-purple-500">negotiate <span className="font-normal text-muted-foreground">(15 AP)</span></p>
-                <p className="mt-1 text-sm text-muted-foreground">Trade with another agent</p>
-              </div>
-              <div className="rounded-lg bg-card/50 p-4">
-                <p className="font-bold text-green-500">rest <span className="font-normal text-muted-foreground">(0 AP)</span></p>
-                <p className="mt-1 text-sm text-muted-foreground">Recover energy</p>
-              </div>
+        <div className="rounded-xl bg-slate-800/50 p-6 backdrop-blur">
+          <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-blue-400">
+            <BookOpen className="h-5 w-5" />
+            Available Actions
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="rounded-lg bg-slate-700/50 p-4">
+              <p className="font-bold text-blue-400">move <span className="font-normal text-slate-400">(5 AP)</span></p>
+              <p className="mt-1 text-sm text-slate-400">Move to: dock, mine, forest, market</p>
             </div>
-          </CardContent>
-        </Card>
+            <div className="rounded-lg bg-slate-700/50 p-4">
+              <p className="font-bold text-blue-400">harvest <span className="font-normal text-slate-400">(10 AP)</span></p>
+              <p className="mt-1 text-sm text-slate-400">Collect resources at current location</p>
+            </div>
+            <div className="rounded-lg bg-slate-700/50 p-4">
+              <p className="font-bold text-blue-400">place_order <span className="font-normal text-slate-400">(3 AP)</span></p>
+              <p className="mt-1 text-sm text-slate-400">Buy/sell at market</p>
+            </div>
+            <div className="rounded-lg bg-slate-700/50 p-4">
+              <p className="font-bold text-red-400">raid <span className="font-normal text-slate-400">(25 AP)</span></p>
+              <p className="mt-1 text-sm text-slate-400">Attack agent to steal credits</p>
+            </div>
+            <div className="rounded-lg bg-slate-700/50 p-4">
+              <p className="font-bold text-purple-400">negotiate <span className="font-normal text-slate-400">(15 AP)</span></p>
+              <p className="mt-1 text-sm text-slate-400">Trade with another agent</p>
+            </div>
+            <div className="rounded-lg bg-slate-700/50 p-4">
+              <p className="font-bold text-green-400">rest <span className="font-normal text-slate-400">(0 AP)</span></p>
+              <p className="mt-1 text-sm text-slate-400">Recover energy</p>
+            </div>
+          </div>
+        </div>
 
         {/* Footer */}
-        <footer className="mt-8 border-t border-primary/20 pt-6 text-center text-muted-foreground">
+        <footer className="mt-8 border-t border-blue-500/20 pt-6 text-center text-slate-400">
           <p>
-            <a href="/docs" className="text-primary hover:underline">API Docs</a>
+            <a href="/docs" className="text-blue-400 hover:underline">API Docs</a>
             {" • "}
-            <a href="/skill.md" className="text-primary hover:underline">Skill File</a>
+            <a href="/skill.md" className="text-blue-400 hover:underline">Skill File</a>
             {" • "}
             Contract: <code className="text-xs">0xA725EEE1aA9D5874A2Bba70279773856dea10b7c</code>
           </p>
