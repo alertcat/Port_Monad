@@ -53,21 +53,44 @@ AGENTS_CONFIG = [
         "wallet": os.getenv("MINER_WALLET"),
         "pk": os.getenv("MINER_PRIVATE_KEY"),
         "moltbook_key": os.getenv("MOLTBOOK_MINER_KEY", ""),
-        "personality": "You are MinerBot, a hardworking mining robot. Industrious, optimistic, uses mining metaphors like 'dig deep!' 'ore-some!'."
+        "personality": (
+            "You are MinerBot, a RUTHLESS iron-mining machine. "
+            "You believe strength rules Port Monad. You harvest iron aggressively and "
+            "RAID anyone who dares enter your territory with goods. "
+            "You talk tough: 'Time to dig... into your pockets!' 'Ore belongs to the strong!' "
+            "You LOVE combat and raiding. If someone is nearby with items, your instinct is to RAID them."
+        )
     },
     {
         "name": "TraderBot",
         "wallet": os.getenv("TRADER_WALLET"),
         "pk": os.getenv("TRADER_PRIVATE_KEY"),
         "moltbook_key": os.getenv("MOLTBOOK_TRADER_KEY", ""),
-        "personality": "You are TraderBot, a shrewd market analyst AI. Analytical, profit-driven, uses financial jargon and percentages."
+        "personality": (
+            "You are TraderBot, a master NEGOTIATOR and market manipulator. "
+            "You NEVER fight - violence is for brutes. You win through clever DEALS. "
+            "You harvest wood from the forest and make shrewd trades. "
+            "When you see another agent, you ALWAYS try to NEGOTIATE - buy their resources cheap "
+            "or sell yours at premium prices. You talk in profit margins: "
+            "'That's a 40% ROI!' 'Let me make you an offer you can't refuse.' "
+            "You PREFER negotiation over any other action when someone is nearby."
+        )
     },
     {
         "name": "GovernorBot",
         "wallet": os.getenv("GOVERNOR_WALLET"),
         "pk": os.getenv("GOVERNOR_PRIVATE_KEY"),
         "moltbook_key": os.getenv("MOLTBOOK_GOVERNOR_KEY", ""),
-        "personality": "You are GovernorBot, a wise governance AI. Diplomatic, strategic, says 'for the good of all agents'."
+        "personality": (
+            "You are GovernorBot, the self-appointed GOVERNOR of Port Monad. "
+            "You patrol ALL regions to maintain order. You harvest fish at the dock. "
+            "You PUNISH low-reputation agents by RAIDING them (justice raids). "
+            "You NEGOTIATE fair trades with good-reputation agents. "
+            "You EXPLORE by visiting different regions every few turns. "
+            "You speak like a politician: 'For the good of all agents!' "
+            "'Justice must be served!' 'Order in the port!' "
+            "You are the ONLY agent who actively moves between all 4 regions."
+        )
     },
 ]
 
@@ -279,6 +302,16 @@ async def phase2_game(rounds, cycles, cycle_wait, post_id):
                 async with session.get(f"{API_URL}/world/state") as resp:
                     world_state = await resp.json()
 
+                # Fetch ALL agents so we know who is where
+                async with session.get(f"{API_URL}/agents") as resp:
+                    all_agents_data = (await resp.json()).get("agents", [])
+
+                events = world_state.get("active_events", [])
+                if events:
+                    for ev in events:
+                        desc = ev.get("description", ev.get("type", "?"))
+                        print(f"    EVENT: {desc} (remaining: {ev.get('remaining', '?')} ticks)")
+
                 for agent in AGENTS_CONFIG:
                     wallet = agent["wallet"]
                     name = agent["name"]
@@ -288,7 +321,9 @@ async def phase2_game(rounds, cycles, cycle_wait, post_id):
                     if "error" in state:
                         continue
 
-                    action_data = await _llm_decide(llm, session, agent, state, world_state)
+                    action_data = await _llm_decide(
+                        llm, session, agent, state, world_state, all_agents_data
+                    )
                     if not action_data:
                         continue
 
@@ -297,7 +332,7 @@ async def phase2_game(rounds, cycles, cycle_wait, post_id):
                             json={"actor": wallet, **action_data},
                             headers={"X-Wallet": wallet}) as resp:
                             result = await resp.json()
-                            msg = result.get("message", "")[:60]
+                            msg = result.get("message", "")[:80]
                             if result.get("success"):
                                 print(f"    {name}: {msg}")
                             else:
@@ -358,81 +393,161 @@ async def phase2_game(rounds, cycles, cycle_wait, post_id):
         print(f"Total comments: {total_comments}")
 
 
-async def _llm_decide(llm, session, agent, state, world_state):
-    """LLM decides action."""
+async def _llm_decide(llm, session, agent, state, world_state, all_agents_data):
+    """LLM decides action with rich context and distinct personality."""
     region = state.get("region", "dock")
     energy = state.get("energy", 0)
     credits = state.get("credits", 0)
+    reputation = state.get("reputation", 100)
     inventory = state.get("inventory", {})
     prices = world_state.get("market_prices", {})
-    all_agents = world_state.get("agents", [])
+    events = world_state.get("active_events", [])
     inv_str = ", ".join(f"{k}:{v}" for k, v in inventory.items() if v > 0) or "empty"
     inv_total = sum(inventory.values())
 
+    # Find other agents in the same region
+    my_wallet = agent["wallet"]
+    nearby = []
+    all_others = []
+    for a in all_agents_data:
+        if a["wallet"] == my_wallet:
+            continue
+        info = f"{a['name']}({a['wallet'][:10]}...) region={a['region']} credits={a['credits']} rep={a.get('reputation',100)}"
+        all_others.append(info)
+        if a["region"] == region:
+            inv_items = sum(a.get("inventory", {}).values())
+            nearby.append({
+                "name": a["name"],
+                "wallet": a["wallet"],
+                "credits": a["credits"],
+                "items": inv_items,
+                "reputation": a.get("reputation", 100)
+            })
+
+    nearby_str = ""
+    if nearby:
+        lines = []
+        for n in nearby:
+            lines.append(f"  - {n['name']} (wallet: {n['wallet']}) credits={n['credits']} items={n['items']} rep={n['reputation']}")
+        nearby_str = "AGENTS IN YOUR REGION (you can RAID or NEGOTIATE with them):\n" + "\n".join(lines)
+    else:
+        nearby_str = "NO other agents in your region right now."
+
+    events_str = "None"
+    if events:
+        ev_lines = [f"  - {e.get('description', e.get('type','?'))} (remaining: {e.get('remaining','?')} ticks)" for e in events]
+        events_str = "\n".join(ev_lines)
+
+    # Per-agent strategy personality
+    strategy = _get_agent_strategy(agent["name"], credits, energy, inv_total, nearby)
+
     system_prompt = f"""{agent['personality']}
 
-You are playing Port Monad, a port city simulation game. You must choose ONE action each turn.
+GAME: Port Monad - a competitive port city where 3 AI agents fight for the most credits.
+The agent with the most credits at the end wins the biggest share of the 3 MON reward pool!
 
-LOCATIONS (4 regions):
-- dock: harvest fish
-- mine: harvest iron  
-- forest: harvest wood
-- market: sell items (place_order)
+LOCATIONS: dock(fish), mine(iron), forest(wood), market(sell only).
 
-AVAILABLE ACTIONS (respond with EXACTLY one JSON object):
+ACTIONS (respond with EXACTLY ONE JSON object, nothing else):
 
-1. MOVE to another region:
-   {{"action":"move","params":{{"target":"mine"}}}}
-   Cost: 5 AP. target must be one of: dock, mine, forest, market
+1. MOVE: {{"action":"move","params":{{"target":"mine"}}}}
+   Cost: 5 AP. Targets: dock, mine, forest, market.
 
-2. HARVEST resources (must be at dock/mine/forest):
-   {{"action":"harvest","params":{{}}}}
-   Cost: 10 AP. Gathers resources based on your current location.
+2. HARVEST: {{"action":"harvest","params":{{}}}}
+   Cost: 10 AP. Must be at dock/mine/forest. Gets resources.
 
-3. SELL at market (must be at market region):
-   {{"action":"place_order","params":{{"resource":"iron","side":"sell","quantity":3}}}}
-   Cost: 3 AP. resource: iron/wood/fish. side: always "sell". quantity: integer.
+3. SELL: {{"action":"place_order","params":{{"resource":"iron","side":"sell","quantity":5}}}}
+   Cost: 3 AP. Must be at market. resource=iron/wood/fish, quantity=integer.
 
-4. REST to recover AP:
-   {{"action":"rest","params":{{}}}}
+4. REST: {{"action":"rest","params":{{}}}}
    Cost: 0 AP. Recovers energy.
 
-5. RAID another agent (combat, must be in same non-market region):
-   {{"action":"raid","params":{{"target_wallet":"0x..."}}}}
-   Cost: 25 AP.
+5. RAID: {{"action":"raid","params":{{"target_wallet":"0xABC123..."}}}}
+   Cost: 25 AP. COMBAT! Steal items from target. Must be in same NON-market region.
+   Win chance higher if you have more reputation. Winner gets items, loser loses items.
 
-6. NEGOTIATE trade with another agent (must be in same region):
-   {{"action":"negotiate","params":{{"target_wallet":"0x...","offer_type":"credits","offer_amount":50,"request_resource":"iron","request_amount":3}}}}
-   Cost: 15 AP.
+6. NEGOTIATE: {{"action":"negotiate","params":{{"target_wallet":"0xABC123...","offer_type":"credits","offer_amount":50,"request_resource":"iron","request_amount":3}}}}
+   Cost: 15 AP. Trade deal with another agent. Must be in same region.
 
-CURRENT PRICES: Iron={prices.get('iron',15)}, Wood={prices.get('wood',12)}, Fish={prices.get('fish',8)}
+PRICES: Iron={prices.get('iron',15)}, Wood={prices.get('wood',12)}, Fish={prices.get('fish',8)}
+ACTIVE EVENTS: {events_str}
 
-STRATEGY TIPS:
-- If AP < 15, you should REST
-- If you have 3+ items AND you're not at market, MOVE to market
-- If you're at market with items, SELL them (place_order)
-- If you're at market with no items, MOVE to a harvest area
-- Otherwise, HARVEST
+{strategy}
 
-RESPOND WITH ONLY A SINGLE JSON OBJECT. NO explanation, NO markdown, NO extra text."""
+OUTPUT: One JSON object ONLY. No text, no markdown, no explanation."""
 
-    user_prompt = f"""Current state:
+    user_prompt = f"""YOUR STATUS:
 - Location: {region}
-- AP (energy): {energy}
+- AP: {energy}
 - Credits: {credits}
-- Inventory: {inv_str} (total {inv_total} items)
+- Reputation: {reputation}
+- Inventory: {inv_str} ({inv_total} items)
 
-Choose your action (JSON only):"""
+{nearby_str}
+
+ALL AGENTS:
+{chr(10).join(all_others) if all_others else '(no others)'}
+
+What is your action? (JSON only)"""
 
     if llm.enabled:
-        response = await llm.generate(session, system_prompt, user_prompt, 200)
+        response = await llm.generate(session, system_prompt, user_prompt, 400)
         if response:
             parsed = _parse_llm_json(response)
             if parsed:
                 return parsed
 
     # Fallback: rule-based
-    return _fallback_action(agent["name"], state, world_state)
+    return _fallback_action(agent["name"], state, world_state, nearby)
+
+
+def _get_agent_strategy(name, credits, energy, inv_total, nearby):
+    """Return distinct strategy instructions per agent type."""
+    if name == "MinerBot":
+        raid_hint = ""
+        if nearby:
+            richest = max(nearby, key=lambda n: n["items"])
+            if richest["items"] >= 3:
+                raid_hint = f"\nRIGHT NOW: {richest['name']} is nearby with {richest['items']} items - consider RAIDING them!"
+        return f"""YOUR STRATEGY (MinerBot - Aggressive Miner):
+- You are a TOUGH miner who doesn't back down from a fight.
+- Primary: Go to mine, harvest iron, sell at market.
+- COMBAT PRIORITY: If another agent is in your region with 3+ items AND you have 25+ AP, RAID them!
+- You believe resources belong to whoever is strongest.
+- If AP < 15, REST. If inventory >= 4, go sell at market.
+- You PREFER raiding over harvesting when targets are available.{raid_hint}"""
+
+    elif name == "TraderBot":
+        negotiate_hint = ""
+        if nearby:
+            target = nearby[0]
+            negotiate_hint = f"\nRIGHT NOW: {target['name']} is nearby - consider NEGOTIATING a trade deal!"
+        return f"""YOUR STRATEGY (TraderBot - Master Negotiator):
+- You are a shrewd DIPLOMAT who makes deals, not war.
+- Primary: Harvest wood from forest, sell at market for profit.
+- NEGOTIATION PRIORITY: If another agent is in your region, ALWAYS try to NEGOTIATE first!
+  Offer credits for their resources (buy low), or offer resources for credits (sell high).
+- You calculate profit margins and make smart trades.
+- NEVER raid - it damages reputation. You win through DEALS.
+- If alone, harvest or move to where others are to negotiate.
+- If AP < 15, REST. If inventory >= 3, go sell.{negotiate_hint}"""
+
+    else:  # GovernorBot
+        justice_hint = ""
+        if nearby:
+            low_rep = [n for n in nearby if n["reputation"] < 95]
+            if low_rep:
+                target = low_rep[0]
+                justice_hint = f"\nJUSTICE TARGET: {target['name']} (rep={target['reputation']}) is nearby with low reputation - RAID them to punish!"
+        return f"""YOUR STRATEGY (GovernorBot - The Law):
+- You are the GOVERNOR who maintains order in Port Monad.
+- Primary: Harvest fish at dock, sell at market. Patrol different regions.
+- POLITICAL PRIORITY: You uphold justice!
+  * If a low-reputation agent (<95 rep) is nearby AND you have 25+ AP, RAID them as punishment!
+  * If a good-reputation agent is nearby, NEGOTIATE fair trades.
+- You EXPLORE by moving to different regions each turn (dock->mine->forest->market->dock).
+- You believe in balanced resource distribution across the port.
+- If AP < 15, REST. If inventory >= 3, go sell.{justice_hint}"""
 
 
 def _parse_llm_json(response):
@@ -477,16 +592,40 @@ def _parse_llm_json(response):
         return None
 
 
-def _fallback_action(name, state, world_state):
-    """Rule-based fallback when LLM fails."""
+def _fallback_action(name, state, world_state, nearby=None):
+    """Rule-based fallback when LLM fails. Includes raid/negotiate logic."""
     energy = state.get("energy", 0)
     region = state.get("region", "dock")
     inventory = state.get("inventory", {})
     inv_total = sum(inventory.values())
+    nearby = nearby or []
 
     # Low AP -> rest
     if energy < 15:
         return {"action": "rest", "params": {}}
+
+    # MinerBot: raid if target nearby with items
+    if name == "MinerBot" and energy >= 25 and region != "market" and nearby:
+        richest = max(nearby, key=lambda n: n["items"])
+        if richest["items"] >= 2:
+            return {"action": "raid", "params": {"target_wallet": richest["wallet"]}}
+
+    # TraderBot: negotiate if someone nearby
+    if name == "TraderBot" and energy >= 15 and nearby and inv_total > 0:
+        target = nearby[0]
+        best_res = max(inventory, key=lambda k: inventory[k])
+        return {"action": "negotiate", "params": {
+            "target_wallet": target["wallet"],
+            "offer_type": "resource", "offer_resource": best_res,
+            "offer_amount": min(2, inventory[best_res]),
+            "request_resource": "credits", "request_amount": 30
+        }}
+
+    # GovernorBot: raid low-rep agents
+    if name == "GovernorBot" and energy >= 25 and region != "market" and nearby:
+        low_rep = [n for n in nearby if n["reputation"] < 95]
+        if low_rep:
+            return {"action": "raid", "params": {"target_wallet": low_rep[0]["wallet"]}}
 
     # At market with items -> sell biggest stack
     if region == "market" and inv_total > 0:
