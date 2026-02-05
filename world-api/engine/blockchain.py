@@ -100,8 +100,13 @@ class WorldGateClient:
         except Exception as e:
             return False, str(e)
 
-    def enter_world(self, private_key: str) -> Tuple[bool, str]:
-        """Call enter() on WorldGate contract."""
+    def enter_world(self, private_key: str, force: bool = False) -> Tuple[bool, str]:
+        """Call enter() on WorldGate contract.
+        
+        Args:
+            force: If True, skip the is_active_entry check and always send
+                   the enter() transaction. Use after batchResetEntries().
+        """
         if not self.contract:
             return False, "No contract address configured"
         
@@ -109,8 +114,19 @@ class WorldGateClient:
             account = Account.from_key(private_key)
             wallet = account.address
             
-            if self.is_active_entry(wallet):
+            if not force and self.is_active_entry(wallet):
                 return True, "Already has active entry"
+            
+            # Double-check on-chain directly (bypass DEBUG_MODE)
+            if force:
+                try:
+                    on_chain_active = self.contract.functions.isActiveEntry(
+                        self.w3.to_checksum_address(wallet)
+                    ).call()
+                    if on_chain_active:
+                        return True, "Already has active entry (on-chain confirmed)"
+                except:
+                    pass
             
             entry_fee = self.get_entry_fee()
             balance = self.get_balance(wallet)

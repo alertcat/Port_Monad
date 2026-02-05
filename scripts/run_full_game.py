@@ -192,8 +192,8 @@ def phase1_on_chain_setup(gate: WorldGateClient):
             print(f"    {'OK' if ok else 'FAIL'}: {r}")
             time.sleep(3)
 
-        print(f"  enter() paying {ENTRY_FEE_MON} MON...")
-        ok, r = gate.enter_world(pk)
+        print(f"  enter() paying {ENTRY_FEE_MON} MON (force=True)...")
+        ok, r = gate.enter_world(pk, force=True)
         print(f"    {'OK' if ok else 'FAIL'}: {r}")
         time.sleep(3)
 
@@ -365,53 +365,153 @@ async def _llm_decide(llm, session, agent, state, world_state):
     credits = state.get("credits", 0)
     inventory = state.get("inventory", {})
     prices = world_state.get("market_prices", {})
+    all_agents = world_state.get("agents", [])
     inv_str = ", ".join(f"{k}:{v}" for k, v in inventory.items() if v > 0) or "empty"
+    inv_total = sum(inventory.values())
 
     system_prompt = f"""{agent['personality']}
-GAME: Port Monad. LOCATIONS: dock(fish), mine(iron), forest(wood), market(sell).
-ACTIONS: move, harvest, place_order, rest, raid, negotiate.
-COSTS: move=5AP, harvest=10AP, place_order=3AP, rest=0AP, raid=25AP, negotiate=15AP.
-PRICES: Iron={prices.get('iron',15)}, Wood={prices.get('wood',12)}, Fish={prices.get('fish',8)}.
-STRATEGY: harvest->sell at market. If AP<20 rest. If have items go sell.
-RESPOND JSON ONLY!"""
 
-    user_prompt = f"Location:{region} AP:{energy} Credits:{credits} Inv:{inv_str}. Action?"
+You are playing Port Monad, a port city simulation game. You must choose ONE action each turn.
+
+LOCATIONS (4 regions):
+- dock: harvest fish
+- mine: harvest iron  
+- forest: harvest wood
+- market: sell items (place_order)
+
+AVAILABLE ACTIONS (respond with EXACTLY one JSON object):
+
+1. MOVE to another region:
+   {{"action":"move","params":{{"target":"mine"}}}}
+   Cost: 5 AP. target must be one of: dock, mine, forest, market
+
+2. HARVEST resources (must be at dock/mine/forest):
+   {{"action":"harvest","params":{{}}}}
+   Cost: 10 AP. Gathers resources based on your current location.
+
+3. SELL at market (must be at market region):
+   {{"action":"place_order","params":{{"resource":"iron","side":"sell","quantity":3}}}}
+   Cost: 3 AP. resource: iron/wood/fish. side: always "sell". quantity: integer.
+
+4. REST to recover AP:
+   {{"action":"rest","params":{{}}}}
+   Cost: 0 AP. Recovers energy.
+
+5. RAID another agent (combat, must be in same non-market region):
+   {{"action":"raid","params":{{"target_wallet":"0x..."}}}}
+   Cost: 25 AP.
+
+6. NEGOTIATE trade with another agent (must be in same region):
+   {{"action":"negotiate","params":{{"target_wallet":"0x...","offer_type":"credits","offer_amount":50,"request_resource":"iron","request_amount":3}}}}
+   Cost: 15 AP.
+
+CURRENT PRICES: Iron={prices.get('iron',15)}, Wood={prices.get('wood',12)}, Fish={prices.get('fish',8)}
+
+STRATEGY TIPS:
+- If AP < 15, you should REST
+- If you have 3+ items AND you're not at market, MOVE to market
+- If you're at market with items, SELL them (place_order)
+- If you're at market with no items, MOVE to a harvest area
+- Otherwise, HARVEST
+
+RESPOND WITH ONLY A SINGLE JSON OBJECT. NO explanation, NO markdown, NO extra text."""
+
+    user_prompt = f"""Current state:
+- Location: {region}
+- AP (energy): {energy}
+- Credits: {credits}
+- Inventory: {inv_str} (total {inv_total} items)
+
+Choose your action (JSON only):"""
 
     if llm.enabled:
-        response = await llm.generate(session, system_prompt, user_prompt, 150)
+        response = await llm.generate(session, system_prompt, user_prompt, 200)
         if response:
-            try:
-                clean = response.strip()
-                if "```" in clean:
-                    clean = clean.split("```")[1].replace("json", "").strip()
-                d = json.loads(clean)
-                action = d.get("action")
-                params = d.get("params", {})
-                if action == "place_order" and "quantity" in params:
-                    params["quantity"] = int(params["quantity"])
-                if action:
-                    return {"action": action, "params": params}
-            except:
-                pass
+            parsed = _parse_llm_json(response)
+            if parsed:
+                return parsed
 
-    # Fallback
+    # Fallback: rule-based
     return _fallback_action(agent["name"], state, world_state)
 
 
+def _parse_llm_json(response):
+    """Robustly parse LLM JSON response."""
+    clean = response.strip()
+    # Remove markdown fences
+    if "```" in clean:
+        parts = clean.split("```")
+        for part in parts:
+            part = part.strip().removeprefix("json").strip()
+            if part.startswith("{"):
+                clean = part
+                break
+    # Find first { ... }
+    start = clean.find("{")
+    end = clean.rfind("}")
+    if start >= 0 and end > start:
+        clean = clean[start:end + 1]
+    try:
+        d = json.loads(clean)
+        action = d.get("action")
+        params = d.get("params", {})
+        if not action:
+            return None
+        # Normalize common LLM mistakes
+        if action == "move" and "target" not in params:
+            # LLM might put region at top level
+            for key in ["region", "destination", "to", "location"]:
+                if key in d:
+                    params["target"] = d[key]
+                    break
+                if key in params:
+                    params["target"] = params.pop(key)
+                    break
+        if action == "place_order":
+            if "quantity" in params:
+                params["quantity"] = int(params["quantity"])
+            if "side" not in params:
+                params["side"] = "sell"
+        return {"action": action, "params": params}
+    except:
+        return None
+
+
 def _fallback_action(name, state, world_state):
+    """Rule-based fallback when LLM fails."""
     energy = state.get("energy", 0)
     region = state.get("region", "dock")
     inventory = state.get("inventory", {})
+    inv_total = sum(inventory.values())
 
-    if energy < 20:
+    # Low AP -> rest
+    if energy < 15:
         return {"action": "rest", "params": {}}
-    if region == "market":
-        for res, qty in inventory.items():
-            if qty > 0:
-                return {"action": "place_order", "params": {"resource": res, "side": "sell", "quantity": qty}}
-    if sum(inventory.values()) >= 5 and region != "market":
+
+    # At market with items -> sell biggest stack
+    if region == "market" and inv_total > 0:
+        best_res = max(inventory, key=lambda k: inventory[k])
+        return {"action": "place_order", "params": {
+            "resource": best_res, "side": "sell", "quantity": inventory[best_res]
+        }}
+
+    # At market with nothing -> go harvest
+    if region == "market" and inv_total == 0:
+        targets = {"MinerBot": "mine", "TraderBot": "forest", "GovernorBot": "dock"}
+        t = targets.get(name, "mine")
+        return {"action": "move", "params": {"target": t}}
+
+    # Inventory full (3+) -> go sell
+    if inv_total >= 3 and region != "market":
         return {"action": "move", "params": {"target": "market"}}
-    targets = {"MinerBot": "mine", "TraderBot": "mine", "GovernorBot": "dock"}
+
+    # At harvest zone -> harvest
+    harvest_zones = {"dock", "mine", "forest"}
+    if region in harvest_zones:
+        return {"action": "harvest", "params": {}}
+
+    # Default: move to preferred zone
+    targets = {"MinerBot": "mine", "TraderBot": "forest", "GovernorBot": "dock"}
     t = targets.get(name, "mine")
     if region != t:
         return {"action": "move", "params": {"target": t}}
