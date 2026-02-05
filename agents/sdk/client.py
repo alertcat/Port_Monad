@@ -7,9 +7,13 @@ from typing import Dict, Any, Optional
 from web3 import Web3
 from eth_account import Account
 
-# Load contract ABI
+# Load contract ABI (prefer V2)
+ABI_PATH_V2 = Path(__file__).parent.parent.parent / 'worldgate_v2_abi.json'
 ABI_PATH = Path(__file__).parent.parent.parent / 'worldgate_abi.json'
-if ABI_PATH.exists():
+if ABI_PATH_V2.exists():
+    with open(ABI_PATH_V2) as f:
+        WORLDGATE_ABI = json.load(f)
+elif ABI_PATH.exists():
     with open(ABI_PATH) as f:
         WORLDGATE_ABI = json.load(f)
 else:
@@ -17,6 +21,8 @@ else:
         {"inputs": [{"name": "agent", "type": "address"}], "name": "isActiveEntry", "outputs": [{"type": "bool"}], "stateMutability": "view", "type": "function"},
         {"inputs": [], "name": "entryFee", "outputs": [{"type": "uint256"}], "stateMutability": "view", "type": "function"},
         {"inputs": [], "name": "enter", "outputs": [], "stateMutability": "payable", "type": "function"},
+        {"inputs": [{"name": "agent", "type": "address"}], "name": "credits", "outputs": [{"type": "uint256"}], "stateMutability": "view", "type": "function"},
+        {"inputs": [{"name": "amount", "type": "uint256"}], "name": "cashout", "outputs": [], "stateMutability": "nonpayable", "type": "function"},
     ]
 
 class PortMonadClient:
@@ -189,3 +195,51 @@ class PortMonadClient:
         if price:
             params["price"] = price
         return await self.submit_action("place_order", params)
+    
+    def cashout(self, credit_amount: int) -> tuple:
+        """
+        Call WorldGateV2.cashout() to convert credits to MON from the reward pool.
+        
+        Args:
+            credit_amount: Number of credits to cash out
+            
+        Returns:
+            (success, tx_hash or error)
+        """
+        if not self.private_key:
+            return False, "Private key not set"
+        if not self.contract:
+            return False, "Contract not configured"
+        
+        try:
+            account = Account.from_key(self.private_key)
+            nonce = self.w3.eth.get_transaction_count(account.address)
+            
+            tx = self.contract.functions.cashout(credit_amount).build_transaction({
+                'from': account.address,
+                'nonce': nonce,
+                'gas': 200000,
+                'gasPrice': self.w3.eth.gas_price,
+                'chainId': self.w3.eth.chain_id
+            })
+            
+            signed_tx = self.w3.eth.account.sign_transaction(tx, self.private_key)
+            tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+            
+            if receipt.status == 1:
+                return True, tx_hash.hex()
+            else:
+                return False, "Transaction reverted"
+        except Exception as e:
+            return False, str(e)
+    
+    def get_on_chain_credits(self) -> int:
+        """Read credits balance from on-chain contract."""
+        if not self.contract:
+            return 0
+        try:
+            wallet = self.w3.to_checksum_address(self.wallet)
+            return self.contract.functions.credits(wallet).call()
+        except:
+            return 0

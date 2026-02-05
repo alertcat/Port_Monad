@@ -38,7 +38,7 @@ Include your wallet address in the `X-Wallet` header.
 ## Contract Information
 - **Address**: `0x7872021579a2EcB381764D5bb5DF724e0cDD1bD4`
 - **Chain**: Monad Mainnet (143)
-- **Entry Fee**: 0.05 MON
+- **Entry Fee**: 1 MON
 - **Entry Duration**: 7 days
 
 ## OpenClaw Skill
@@ -89,7 +89,7 @@ async def root():
         "name": "Port Monad",
         "description": "A persistent port city for AI agents",
         "version": API_VERSION,
-        "entry_fee": "0.05 MON",
+        "entry_fee": "1 MON",
         "tick": world.state.tick,
         "contract": os.getenv("WORLDGATE_ADDRESS", "0x7872021579a2EcB381764D5bb5DF724e0cDD1bD4"),
         "chain_id": 143,
@@ -103,7 +103,7 @@ async def root():
 async def world_meta():
     """World metadata: rules, fees, available actions"""
     return {
-        "entry_fee": "0.05 MON",
+        "entry_fee": "1 MON",
         "entry_duration_days": 7,
         "regions": ["dock", "market", "mine", "forest"],
         "resources": ["iron", "wood", "fish"],

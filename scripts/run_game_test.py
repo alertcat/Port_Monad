@@ -622,9 +622,50 @@ def run_simulation(rounds: int = 10):
     print("#"*70 + "\n")
 
 
+def run_on_chain_setup():
+    """Phase 1+2: Set entry fee, distribute MON, enter world, fund pool."""
+    print("\n" + "="*70)
+    print("  ON-CHAIN SETUP: Entry Fee + Enter World + Fund Pool")
+    print("="*70)
+
+    # Import and run setup
+    import subprocess
+    print("\n--- Running setup_entry_test.py ---")
+    subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), "setup_entry_test.py")], check=False)
+
+    print("\n--- Running test_enter.py ---")
+    subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), "test_enter.py")], check=False)
+
+    print("\nOn-chain setup complete!\n")
+
+
+def run_on_chain_settlement(api_url: str):
+    """Phase 4: Settle credits and distribute MON proportionally."""
+    print("\n" + "="*70)
+    print("  ON-CHAIN SETTLEMENT: Distribute Reward Pool by Credits")
+    print("="*70)
+
+    import subprocess
+    subprocess.run([
+        sys.executable,
+        os.path.join(os.path.dirname(__file__), "settle_and_exit.py"),
+        "--api", api_url
+    ], check=False)
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Port Monad full game simulation")
     parser.add_argument("--rounds", "-r", type=int, default=10, help="Number of rounds (default: 10)")
+    parser.add_argument("--with-chain", action="store_true",
+                        help="Enable on-chain operations: setup entry fee, enter world, settle MON at end")
+    parser.add_argument("--api", default=os.getenv("API_URL", "http://localhost:8000"))
     args = parser.parse_args()
+
+    if args.with_chain:
+        run_on_chain_setup()
+
     run_simulation(args.rounds)
+
+    if args.with_chain:
+        run_on_chain_settlement(args.api)

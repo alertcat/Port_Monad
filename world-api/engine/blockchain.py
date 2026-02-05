@@ -70,13 +70,13 @@ class WorldGateClient:
     def get_entry_fee(self) -> int:
         """Get current entry fee in wei"""
         if not self.contract:
-            return self.w3.to_wei(0.05, 'ether')  # Default
+            return self.w3.to_wei(1, 'ether')  # Default: 1 MON
         
         try:
             return self.contract.functions.entryFee().call()
         except Exception as e:
             print(f"Error getting entryFee: {e}")
-            return self.w3.to_wei(0.05, 'ether')
+            return self.w3.to_wei(1, 'ether')
     
     def get_balance(self, wallet: str) -> int:
         """Get wallet balance in wei"""
@@ -87,11 +87,21 @@ class WorldGateClient:
             print(f"Error getting balance: {e}")
             return 0
     
+    def _send_tx(self, private_key: str, tx: dict) -> Tuple[bool, str]:
+        """Sign, send, and wait for a transaction. Returns (success, tx_hash_or_error)."""
+        try:
+            signed_tx = self.w3.eth.account.sign_transaction(tx, private_key)
+            tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
+            if receipt.status == 1:
+                return True, tx_hash.hex()
+            else:
+                return False, f"Transaction reverted: {tx_hash.hex()}"
+        except Exception as e:
+            return False, str(e)
+
     def enter_world(self, private_key: str) -> Tuple[bool, str]:
-        """
-        Call enter() on WorldGate contract
-        Returns: (success, tx_hash or error message)
-        """
+        """Call enter() on WorldGate contract."""
         if not self.contract:
             return False, "No contract address configured"
         
@@ -99,42 +109,135 @@ class WorldGateClient:
             account = Account.from_key(private_key)
             wallet = account.address
             
-            # Check if already entered
             if self.is_active_entry(wallet):
                 return True, "Already has active entry"
             
-            # Get entry fee
             entry_fee = self.get_entry_fee()
-            
-            # Check balance
             balance = self.get_balance(wallet)
             if balance < entry_fee:
                 return False, f"Insufficient balance: {self.w3.from_wei(balance, 'ether')} MON, need {self.w3.from_wei(entry_fee, 'ether')} MON"
             
-            # Build transaction
             nonce = self.w3.eth.get_transaction_count(wallet)
-            
             tx = self.contract.functions.enter().build_transaction({
                 'from': wallet,
                 'value': entry_fee,
+                'nonce': nonce,
+                'gas': 200000,
+                'gasPrice': self.w3.eth.gas_price,
+                'chainId': self.w3.eth.chain_id
+            })
+            return self._send_tx(private_key, tx)
+        except Exception as e:
+            return False, str(e)
+
+    def set_entry_fee(self, private_key: str, new_fee_wei: int) -> Tuple[bool, str]:
+        """Call setEntryFee() - owner only."""
+        if not self.contract:
+            return False, "No contract configured"
+        try:
+            account = Account.from_key(private_key)
+            nonce = self.w3.eth.get_transaction_count(account.address)
+            tx = self.contract.functions.setEntryFee(new_fee_wei).build_transaction({
+                'from': account.address,
                 'nonce': nonce,
                 'gas': 100000,
                 'gasPrice': self.w3.eth.gas_price,
                 'chainId': self.w3.eth.chain_id
             })
-            
-            # Sign and send
-            signed_tx = self.w3.eth.account.sign_transaction(tx, private_key)
-            tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
-            
-            # Wait for receipt
-            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
-            
-            if receipt.status == 1:
-                return True, tx_hash.hex()
-            else:
-                return False, f"Transaction failed: {tx_hash.hex()}"
-        
+            return self._send_tx(private_key, tx)
+        except Exception as e:
+            return False, str(e)
+
+    def fund_reward_pool(self, private_key: str, amount_wei: int) -> Tuple[bool, str]:
+        """Call fundRewardPool() with value."""
+        if not self.contract:
+            return False, "No contract configured"
+        try:
+            account = Account.from_key(private_key)
+            nonce = self.w3.eth.get_transaction_count(account.address)
+            tx = self.contract.functions.fundRewardPool().build_transaction({
+                'from': account.address,
+                'value': amount_wei,
+                'nonce': nonce,
+                'gas': 100000,
+                'gasPrice': self.w3.eth.gas_price,
+                'chainId': self.w3.eth.chain_id
+            })
+            return self._send_tx(private_key, tx)
+        except Exception as e:
+            return False, str(e)
+
+    def update_credits_on_chain(self, private_key: str, agent_wallet: str, credits: int) -> Tuple[bool, str]:
+        """Call updateCredits() - owner/authorized server only."""
+        if not self.contract:
+            return False, "No contract configured"
+        try:
+            account = Account.from_key(private_key)
+            agent_addr = self.w3.to_checksum_address(agent_wallet)
+            nonce = self.w3.eth.get_transaction_count(account.address)
+            tx = self.contract.functions.updateCredits(agent_addr, credits).build_transaction({
+                'from': account.address,
+                'nonce': nonce,
+                'gas': 100000,
+                'gasPrice': self.w3.eth.gas_price,
+                'chainId': self.w3.eth.chain_id
+            })
+            return self._send_tx(private_key, tx)
+        except Exception as e:
+            return False, str(e)
+
+    def get_reward_pool(self) -> int:
+        """Read rewardPool balance in wei."""
+        if not self.contract:
+            return 0
+        try:
+            return self.contract.functions.rewardPool().call()
+        except Exception as e:
+            print(f"Error reading rewardPool: {e}")
+            return 0
+
+    def get_contract_balance(self) -> int:
+        """Read total contract balance in wei."""
+        if not self.contract_address:
+            return 0
+        try:
+            return self.w3.eth.get_balance(self.w3.to_checksum_address(self.contract_address))
+        except:
+            return 0
+
+    def send_mon(self, private_key: str, to_address: str, amount_wei: int) -> Tuple[bool, str]:
+        """Send MON directly from one wallet to another."""
+        try:
+            account = Account.from_key(private_key)
+            to_addr = self.w3.to_checksum_address(to_address)
+            nonce = self.w3.eth.get_transaction_count(account.address)
+            tx = {
+                'nonce': nonce,
+                'to': to_addr,
+                'value': amount_wei,
+                'gas': 21000,
+                'gasPrice': self.w3.eth.gas_price,
+                'chainId': self.w3.eth.chain_id
+            }
+            return self._send_tx(private_key, tx)
+        except Exception as e:
+            return False, str(e)
+
+    def withdraw_fees(self, private_key: str) -> Tuple[bool, str]:
+        """Call withdrawFees() - owner only. Withdraws entry fees (not reward pool)."""
+        if not self.contract:
+            return False, "No contract configured"
+        try:
+            account = Account.from_key(private_key)
+            nonce = self.w3.eth.get_transaction_count(account.address)
+            tx = self.contract.functions.withdrawFees().build_transaction({
+                'from': account.address,
+                'nonce': nonce,
+                'gas': 100000,
+                'gasPrice': self.w3.eth.gas_price,
+                'chainId': self.w3.eth.chain_id
+            })
+            return self._send_tx(private_key, tx)
         except Exception as e:
             return False, str(e)
 
