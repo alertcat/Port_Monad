@@ -112,6 +112,25 @@ contract WorldGateV2 {
     }
     
     /**
+     * @notice Reset an agent's entry (owner only, for testing/new rounds)
+     * @dev Sets isActive to false so the agent can re-enter and pay again
+     */
+    function resetEntry(address agent) external onlyOwner {
+        entries[agent].isActive = false;
+        entries[agent].expiresAt = 0;
+    }
+
+    /**
+     * @notice Batch reset multiple agents' entries
+     */
+    function batchResetEntries(address[] calldata agents) external onlyOwner {
+        for (uint i = 0; i < agents.length; i++) {
+            entries[agents[i]].isActive = false;
+            entries[agents[i]].expiresAt = 0;
+        }
+    }
+
+    /**
      * @notice Update agent credits (only authorized servers)
      * @dev Called by game server to sync off-chain credits to on-chain
      */

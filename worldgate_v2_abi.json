@@ -180,6 +180,19 @@
         "internalType": "address[]",
         "name": "agents",
         "type": "address[]"
+      }
+    ],
+    "name": "batchResetEntries",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address[]",
+        "name": "agents",
+        "type": "address[]"
       },
       {
         "internalType": "uint256[]",
@@ -452,6 +465,19 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "agent",
+        "type": "address"
+      }
+    ],
+    "name": "resetEntry",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

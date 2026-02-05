@@ -223,6 +223,44 @@ class WorldGateClient:
         except Exception as e:
             return False, str(e)
 
+    def reset_entry(self, private_key: str, agent_wallet: str) -> Tuple[bool, str]:
+        """Call resetEntry(agent) - owner only. Sets entry to inactive."""
+        if not self.contract:
+            return False, "No contract configured"
+        try:
+            account = Account.from_key(private_key)
+            agent_addr = self.w3.to_checksum_address(agent_wallet)
+            nonce = self.w3.eth.get_transaction_count(account.address)
+            tx = self.contract.functions.resetEntry(agent_addr).build_transaction({
+                'from': account.address,
+                'nonce': nonce,
+                'gas': 100000,
+                'gasPrice': self.w3.eth.gas_price,
+                'chainId': self.w3.eth.chain_id
+            })
+            return self._send_tx(private_key, tx)
+        except Exception as e:
+            return False, str(e)
+
+    def batch_reset_entries(self, private_key: str, wallets: list) -> Tuple[bool, str]:
+        """Call batchResetEntries() - owner only."""
+        if not self.contract:
+            return False, "No contract configured"
+        try:
+            account = Account.from_key(private_key)
+            addrs = [self.w3.to_checksum_address(w) for w in wallets]
+            nonce = self.w3.eth.get_transaction_count(account.address)
+            tx = self.contract.functions.batchResetEntries(addrs).build_transaction({
+                'from': account.address,
+                'nonce': nonce,
+                'gas': 200000,
+                'gasPrice': self.w3.eth.gas_price,
+                'chainId': self.w3.eth.chain_id
+            })
+            return self._send_tx(private_key, tx)
+        except Exception as e:
+            return False, str(e)
+
     def set_credit_exchange_rate(self, private_key: str, new_rate: int) -> Tuple[bool, str]:
         """Call setCreditExchangeRate() - owner only."""
         if not self.contract:
