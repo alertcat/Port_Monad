@@ -467,9 +467,12 @@ ACTIONS (respond with EXACTLY ONE JSON object, nothing else):
    Win chance higher if you have more reputation. Winner gets items, loser loses items.
    "target" must be the FULL wallet address (0x...) of an agent in your region.
 
-6. NEGOTIATE: {{"action":"negotiate","params":{{"target":"0xABC123...","offer_type":"credits","offer_amount":50,"request_resource":"iron","request_amount":3}}}}
-   Cost: 15 AP. Trade deal with another agent. Must be in same region.
-   "target" must be the FULL wallet address (0x...) of an agent in your region.
+6. NEGOTIATE: Offer credits for resources, or offer resources for credits.
+   Example A - Buy iron with credits:
+   {{"action":"negotiate","params":{{"target":"0xABC123...","offer_type":"credits","offer_amount":50,"want_type":"resource","want_resource":"iron","want_amount":3}}}}
+   Example B - Sell wood for credits:
+   {{"action":"negotiate","params":{{"target":"0xABC123...","offer_type":"resource","offer_resource":"wood","offer_amount":3,"want_type":"credits","want_amount":40}}}}
+   Cost: 15 AP. Must be in same region. "target" = FULL wallet address (0x...).
 
 PRICES: Iron={prices.get('iron',15)}, Wood={prices.get('wood',12)}, Fish={prices.get('fish',8)}
 ACTIVE EVENTS: {events_str}
@@ -607,6 +610,30 @@ def _parse_llm_json(response):
             if not (isinstance(t, str) and t.startswith("0x") and len(t) >= 10):
                 return None  # invalid target, fall back to rule-based
 
+        # ---- Normalize negotiate params ----
+        # Engine uses: offer_type, offer_amount, offer_resource, want_type, want_amount, want_resource
+        # LLM might use: request_type, request_amount, request_resource
+        if action == "negotiate":
+            if "want_type" not in params and "request_type" in params:
+                params["want_type"] = params.pop("request_type")
+            if "want_amount" not in params and "request_amount" in params:
+                params["want_amount"] = params.pop("request_amount")
+            if "want_resource" not in params and "request_resource" in params:
+                params["want_resource"] = params.pop("request_resource")
+            # If LLM used offer_type=credits but no want_type, infer from context
+            if "want_type" not in params:
+                if params.get("offer_type") == "credits":
+                    params["want_type"] = "resource"
+                elif params.get("offer_type") == "resource":
+                    params["want_type"] = "credits"
+            # Ensure amounts are integers
+            for k in ["offer_amount", "want_amount"]:
+                if k in params:
+                    try:
+                        params[k] = int(params[k])
+                    except (ValueError, TypeError):
+                        params[k] = 0
+
         return {"action": action, "params": params}
     except:
         return None
@@ -638,7 +665,7 @@ def _fallback_action(name, state, world_state, nearby=None):
             "target": target["wallet"],
             "offer_type": "resource", "offer_resource": best_res,
             "offer_amount": min(2, inventory[best_res]),
-            "request_resource": "credits", "request_amount": 30
+            "want_type": "credits", "want_amount": 30
         }}
 
     # GovernorBot: raid low-rep agents

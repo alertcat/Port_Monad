@@ -14,14 +14,14 @@ class EventType(str, Enum):
     PLAGUE = "plague"            # Plague
 
 # Event probability table (per tick)
-# With 10 ticks: ~85% chance of at least one event per game
+# Tuned so ~1-2 events per 10 ticks (balanced gameplay)
 EVENT_PROBABILITIES = {
-    EventType.STORM: 0.10,
-    EventType.PIRATES: 0.08,
-    EventType.TRADE_BOOM: 0.15,
-    EventType.MINE_COLLAPSE: 0.06,
-    EventType.FESTIVAL: 0.10,
-    EventType.PLAGUE: 0.03,
+    EventType.STORM: 0.04,
+    EventType.PIRATES: 0.03,
+    EventType.TRADE_BOOM: 0.06,
+    EventType.MINE_COLLAPSE: 0.02,
+    EventType.FESTIVAL: 0.04,
+    EventType.PLAGUE: 0.01,
 }
 
 # Event durations (ticks)
