@@ -177,6 +177,80 @@ async def reset_world():
         "tick": world.state.tick
     }
 
+
+@router.post("/debug/reset_all_credits")
+async def reset_all_credits(credits: int = 1000):
+    """Debug: reset ALL agents' credits to specified amount"""
+    from engine.state import get_world_engine
+    
+    world = get_world_engine()
+    
+    results = []
+    for wallet, agent in world.agents.items():
+        old_credits = agent.credits
+        agent.credits = credits
+        agent.energy = 100  # Also reset energy
+        results.append({
+            "name": agent.name,
+            "wallet": wallet[:10] + "...",
+            "old_credits": old_credits,
+            "new_credits": credits
+        })
+    
+    return {
+        "success": True,
+        "message": f"Reset {len(results)} agents to {credits} credits",
+        "agents": results
+    }
+
+@router.delete("/debug/delete_agent/{wallet}")
+async def delete_agent(wallet: str):
+    """Debug: delete an agent from the world"""
+    from engine.state import get_world_engine
+    
+    world = get_world_engine()
+    
+    if wallet not in world.agents:
+        return {"success": False, "error": f"Agent {wallet} not found"}
+    
+    agent_name = world.agents[wallet].name
+    del world.agents[wallet]
+    
+    return {
+        "success": True,
+        "message": f"Agent {agent_name} ({wallet}) deleted"
+    }
+
+
+@router.post("/debug/delete_test_agents")
+async def delete_test_agents():
+    """Debug: delete all test agents (wallets not starting with 0x followed by hex)"""
+    from engine.state import get_world_engine
+    import re
+    
+    world = get_world_engine()
+    
+    # Find test wallets (not valid Ethereum addresses)
+    test_wallets = []
+    for wallet in list(world.agents.keys()):
+        # Valid ETH address: 0x followed by 40 hex chars
+        if not re.match(r'^0x[a-fA-F0-9]{40}$', wallet):
+            test_wallets.append(wallet)
+    
+    # Delete test agents
+    deleted = []
+    for wallet in test_wallets:
+        agent_name = world.agents[wallet].name
+        del world.agents[wallet]
+        deleted.append({"wallet": wallet, "name": agent_name})
+    
+    return {
+        "success": True,
+        "message": f"Deleted {len(deleted)} test agents",
+        "deleted": deleted
+    }
+
+
 @router.get("/gate/status/{wallet}")
 async def gate_status(wallet: str):
     """Check wallet's on-chain entry status"""
@@ -215,6 +289,7 @@ async def list_agents():
     Get list of all registered agents and their states.
     Useful for external agents to see the competition.
     """
+    from engine.state import get_world_engine
     world = get_world_engine()
     
     agents = []

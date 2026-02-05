@@ -1,6 +1,14 @@
-"""MinerBot - Mining robot with on-chain entry"""
+"""MinerBot - Mining robot with on-chain entry
+
+Strategy:
+  1. Primary: harvest iron/wood in mine, sell at market
+  2. Combat: raid nearby agents when strong and target is weak
+  3. Exploration: periodically visit forest for wood diversification
+  4. Politics: negotiate resource trades when profitable
+"""
 import asyncio
 import os
+import random
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
@@ -15,34 +23,54 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [MinerBot] %(message
 log = logging.getLogger(__name__)
 
 class MinerBot:
-    """Miner robot: harvest -> sell"""
+    """Miner robot: harvest -> sell, with combat and exploration"""
     
     SELL_THRESHOLD = 10
+    EXPLORE_CHANCE = 0.15       # 15% chance to explore forest
+    RAID_CHANCE = 0.20          # 20% chance to raid when conditions met
+    NEGOTIATE_CHANCE = 0.25     # 25% chance to negotiate a trade
     
     def __init__(self, client: PortMonadClient):
         self.client = client
+        self.cycle_count = 0
     
-    async def decide(self, my_state: dict, world_state: dict) -> dict:
-        """Decide: return action to execute"""
+    async def decide(self, my_state: dict, world_state: dict, all_agents: list) -> dict:
+        """Decide: return action to execute
+        
+        Decision priority:
+          1. Low AP → rest
+          2. Inventory full → go sell at market
+          3. At market with inventory → sell
+          4. At market, consider negotiate with nearby agents
+          5. Chance to raid weak agent in same region
+          6. Chance to explore forest for wood
+          7. Default: go to mine → harvest
+        """
         energy = my_state.get("energy", 0)
         inventory = my_state.get("inventory", {})
         region = my_state.get("region", "dock")
+        credits = my_state.get("credits", 0)
+        reputation = my_state.get("reputation", 100)
+        my_wallet = my_state.get("wallet", "")
         
         iron = inventory.get("iron", 0)
         wood = inventory.get("wood", 0)
         total_resources = iron + wood
+        
+        self.cycle_count += 1
         
         # Priority 1: Low AP, rest
         if energy < 20:
             log.info(f"Low AP ({energy}), resting")
             return {"action": "rest"}
         
-        # Priority 2: Inventory full, go to market
+        # Priority 2: Inventory full, go to market to sell
         if total_resources >= self.SELL_THRESHOLD:
             if region != "market":
                 log.info(f"Inventory full ({total_resources}), going to market")
                 return {"action": "move", "params": {"target": "market"}}
             else:
+                # At market: sell resources
                 if iron > 0:
                     log.info(f"Selling {iron} iron")
                     return {"action": "place_order", "params": {
@@ -54,7 +82,53 @@ class MinerBot:
                         "resource": "wood", "side": "sell", "quantity": wood
                     }}
         
-        # Priority 3: Go to mine
+        # Priority 3: Negotiate (Politics) - trade resources with nearby agent
+        if region == "market" and energy >= 15 and random.random() < self.NEGOTIATE_CHANCE:
+            nearby = [a for a in all_agents 
+                      if a["region"] == region 
+                      and a["wallet"] != my_wallet
+                      and a.get("inventory", {}).get("fish", 0) > 0]
+            if nearby and iron >= 2:
+                target = random.choice(nearby)
+                log.info(f"[POLITICS] Negotiating with {target['name']}: offer 2 iron for 3 fish")
+                return {"action": "negotiate", "params": {
+                    "target": target["wallet"],
+                    "offer_type": "resource",
+                    "offer_resource": "iron",
+                    "offer_amount": 2,
+                    "want_type": "resource",
+                    "want_resource": "fish",
+                    "want_amount": 3
+                }}
+        
+        # Priority 4: Raid (Combat) - attack weak nearby agents
+        if energy >= 25 and reputation > 50 and random.random() < self.RAID_CHANCE:
+            # Find weaker agents in same non-market region
+            nearby_weak = [a for a in all_agents 
+                           if a["region"] == region 
+                           and a["wallet"] != my_wallet
+                           and region != "market"
+                           and a.get("credits", 0) > 200
+                           and a.get("reputation", 100) < reputation]
+            if nearby_weak:
+                target = min(nearby_weak, key=lambda a: a.get("reputation", 100))
+                log.info(f"[COMBAT] Raiding {target['name']} (credits: {target['credits']}, rep: {target.get('reputation', '?')})")
+                return {"action": "raid", "params": {"target": target["wallet"]}}
+        
+        # Priority 5: Exploration - visit forest for wood
+        if region == "mine" and random.random() < self.EXPLORE_CHANCE and energy >= 15:
+            log.info("[EXPLORATION] Heading to forest to gather wood")
+            return {"action": "move", "params": {"target": "forest"}}
+        
+        # Priority 6: Harvest in forest (if exploring)
+        if region == "forest":
+            if wood >= 5:
+                log.info(f"[EXPLORATION] Got enough wood ({wood}), returning to mine")
+                return {"action": "move", "params": {"target": "mine"}}
+            log.info("[EXPLORATION] Gathering wood in forest")
+            return {"action": "harvest"}
+        
+        # Default: Go to mine and harvest
         if region != "mine":
             log.info("Going to mine")
             return {"action": "move", "params": {"target": "mine"}}
@@ -71,7 +145,14 @@ class MinerBot:
                 return None
             
             world_state = await self.client.get_world_state()
-            action = await self.decide(my_state, world_state)
+            
+            # Get all agents for social interactions
+            session = await self.client._get_session()
+            async with session.get(f"{self.client.api_url}/agents") as resp:
+                agents_data = await resp.json()
+            all_agents = agents_data.get("agents", [])
+            
+            action = await self.decide(my_state, world_state, all_agents)
             
             if action:
                 result = await self.client.submit_action(
