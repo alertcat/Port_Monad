@@ -539,7 +539,16 @@ async def _llm_comment(llm, session, agent, state, world_state, tick):
 # Phase 3: On-Chain Settlement (agents self-cashout)
 # =============================================================================
 def phase3_settlement(gate: WorldGateClient):
-    """Sync credits on-chain, adjust exchange rate, agents call cashout()."""
+    """Sync credits on-chain, adjust exchange rate, agents call cashout().
+
+    Key insight on precision:
+      Contract formula: monAmount = (credits * 1e15) / creditExchangeRate
+      With rate=1: monAmount = credits * 1e15  (1 credit = 0.001 MON)
+
+      So we set rate=1 and convert each agent's SHARE into integer credits
+      that will exactly drain the pool.  The last agent gets the remainder
+      to absorb any rounding dust (at most 0.001 MON).
+    """
     print("\n" + "=" * 70)
     print("  PHASE 3: ON-CHAIN SETTLEMENT")
     print("=" * 70)
@@ -558,55 +567,88 @@ def phase3_settlement(gate: WorldGateClient):
     pool_wei = gate.get_reward_pool()
     pool_mon = float(gate.w3.from_wei(pool_wei, 'ether'))
 
-    print(f"\nReward pool: {pool_mon} MON")
+    print(f"\nReward pool:   {pool_mon} MON  ({pool_wei} wei)")
     print(f"Total credits: {total_credits}")
 
-    print(f"\n{'Agent':<15} {'Credits':>8} {'Share':>8} {'MON':>10}")
-    print("-" * 45)
-    for wallet, info in credit_map.items():
-        share = info["credits"] / total_credits if total_credits > 0 else 0
-        mon = pool_mon * share
-        print(f"{info['name']:<15} {info['credits']:>8} {share:>7.1%} {mon:>8.4f}")
+    if total_credits == 0 or pool_wei == 0:
+        print("Nothing to settle.")
+        return
 
-    # Step 1: Sync credits on-chain
+    # ---- Step 1: Set exchange rate = 1 ----
+    # With rate=1: cashout(N) -> agent receives N * 1e15 wei = N * 0.001 MON
+    print(f"\n--- Setting creditExchangeRate = 1 ---")
+    ok, r = gate.set_credit_exchange_rate(DEPLOY_PK, 1)
+    print(f"  {'OK' if ok else 'FAIL'}: {r}")
+    time.sleep(3)
+
+    # ---- Step 2: Compute proportional on-chain credits (integer) ----
+    # total_cashable = pool_wei // 1e15  (max integer credits at rate=1)
+    # Each agent gets: floor(total_cashable * their_credits / total_credits)
+    # Last agent gets: total_cashable - sum_of_others (absorbs rounding dust)
+    UNIT = 10 ** 15  # 1 credit = 0.001 MON at rate=1
+    total_cashable = pool_wei // UNIT  # integer credits that perfectly drain pool
+
+    sorted_agents = sorted(credit_map.items(), key=lambda x: x[1]["credits"])
+    on_chain_credits = {}
+    assigned = 0
+
+    print(f"\n  Pool can distribute {total_cashable} credits (at 0.001 MON each)")
+    print(f"\n{'Agent':<15} {'Game Cr':>8} {'Share':>8} {'Chain Cr':>9} {'MON':>10}")
+    print("-" * 55)
+
+    for i, (wallet, info) in enumerate(sorted_agents):
+        share_pct = info["credits"] / total_credits
+        if i == len(sorted_agents) - 1:
+            # Last agent absorbs rounding remainder
+            oc = total_cashable - assigned
+        else:
+            oc = total_cashable * info["credits"] // total_credits
+        on_chain_credits[wallet] = oc
+        assigned += oc
+        mon_out = float(oc) * 0.001
+        print(f"{info['name']:<15} {info['credits']:>8} {share_pct:>7.1%} {oc:>9} {mon_out:>8.4f}")
+
+    # Verify: total assigned must equal total_cashable
+    verify_sum = sum(on_chain_credits.values())
+    print(f"\nVerify: assigned={verify_sum}, cashable={total_cashable}, match={verify_sum == total_cashable}")
+    print(f"Pool dust after cashout: {pool_wei - verify_sum * UNIT} wei ({float(pool_wei - verify_sum * UNIT) / 1e18:.6f} MON)")
+
+    # ---- Step 3: Write on-chain credits ----
     print(f"\n--- Syncing credits on-chain ---")
-    for wallet, info in credit_map.items():
-        print(f"  updateCredits({info['name']}, {info['credits']})...")
-        ok, r = gate.update_credits_on_chain(DEPLOY_PK, wallet, info["credits"])
+    for wallet, oc in on_chain_credits.items():
+        name = credit_map[wallet]["name"]
+        print(f"  updateCredits({name}, {oc})...")
+        ok, r = gate.update_credits_on_chain(DEPLOY_PK, wallet, oc)
         print(f"    {'OK' if ok else 'FAIL'}: {r}")
         time.sleep(2)
 
-    # Step 2: Adjust exchange rate so totalCredits maps to pool
-    if total_credits > 0 and pool_wei > 0:
-        new_rate = (total_credits * 10**15) // pool_wei
-        if new_rate < 1:
-            new_rate = 1
-        print(f"\n--- Setting exchange rate to {new_rate} ---")
-        print(f"  ({total_credits} credits = {pool_mon} MON)")
-        ok, r = gate.set_credit_exchange_rate(DEPLOY_PK, new_rate)
-        print(f"  {'OK' if ok else 'FAIL'}: {r}")
-        time.sleep(3)
-
-    # Step 3: Each agent calls cashout()
+    # ---- Step 4: Each agent calls cashout() ----
     print(f"\n--- Agents calling cashout() ---")
     for agent in AGENTS_CONFIG:
         wallet = agent["wallet"]
         pk = agent["pk"]
-        info = credit_map.get(wallet)
-        if not info:
+        oc = on_chain_credits.get(wallet, 0)
+        name = credit_map.get(wallet, {}).get("name", agent["name"])
+
+        if oc < 100:
+            print(f"  {name}: {oc} credits below min (100), skipping")
             continue
 
-        credits_amount = info["credits"]
-        name = info["name"]
-
-        if credits_amount < 100:
-            print(f"  {name}: {credits_amount} credits below min (100), skipping")
-            continue
-
-        remaining = credits_amount
+        remaining = oc
         while remaining > 0:
             chunk = min(remaining, 10000)
-            print(f"  {name}: cashout({chunk})...")
+
+            # Safety: double-check remaining pool can cover this chunk
+            current_pool = gate.get_reward_pool()
+            max_afford = current_pool // UNIT
+            if chunk > max_afford:
+                print(f"  {name}: pool has {max_afford} credits left, adjusting chunk {chunk} -> {max_afford}")
+                chunk = max_afford
+            if chunk < 100:
+                print(f"  {name}: remaining chunk {chunk} < min 100, stopping")
+                break
+
+            print(f"  {name}: cashout({chunk}) -> {chunk * 0.001:.3f} MON ...")
 
             try:
                 account = Account.from_key(pk)
@@ -620,7 +662,7 @@ def phase3_settlement(gate: WorldGateClient):
                 })
                 ok, result = gate._send_tx(pk, tx)
                 if ok:
-                    print(f"    TX: {result}")
+                    print(f"    OK TX: {result}")
                     remaining -= chunk
                 else:
                     print(f"    FAIL: {result}")
@@ -630,7 +672,7 @@ def phase3_settlement(gate: WorldGateClient):
                 break
             time.sleep(3)
 
-    # Final summary
+    # ---- Final summary ----
     print(f"\n{'=' * 60}")
     print("  SETTLEMENT COMPLETE")
     print(f"{'=' * 60}")
@@ -641,7 +683,10 @@ def phase3_settlement(gate: WorldGateClient):
         print(f"{agent['name']:<15} {float(bal):>13.4f} MON")
     deployer_bal = gate.w3.from_wei(gate.get_balance(Account.from_key(DEPLOY_PK).address), 'ether')
     print(f"{'Deployer':<15} {float(deployer_bal):>13.4f} MON")
-    print(f"Remaining pool: {gate.w3.from_wei(gate.get_reward_pool(), 'ether')} MON")
+    remaining_pool = gate.get_reward_pool()
+    print(f"Remaining pool: {gate.w3.from_wei(remaining_pool, 'ether')} MON ({remaining_pool} wei)")
+    if remaining_pool > 0:
+        print(f"  (dust < 0.001 MON, owner can reclaim via emergencyWithdraw)")
 
 
 # =============================================================================
