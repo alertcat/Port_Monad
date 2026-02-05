@@ -1,0 +1,14 @@
+{
+  "name": "worldgate-contracts",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "compile": "hardhat compile",
+    "verify": "hardhat verify --network monad"
+  },
+  "devDependencies": {
+    "hardhat": "^2.22.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "dotenv": "^16.0.0"
+  }
+}

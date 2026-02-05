@@ -1,0 +1,7 @@
+{
+  "network": "monad_mainnet",
+  "chain_id": 143,
+  "rpc": "https://rpc.monad.xyz",
+  "contract_address": "0x7872021579a2EcB381764D5bb5DF724e0cDD1bD4",
+  "deployed_at": "2026-02-05T04:55:45.482683"
+}

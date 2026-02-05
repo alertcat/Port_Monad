@@ -1,0 +1,71 @@
+{"tick": 0, "agent": "GovernorBot", "action": "place_order", "message": "Sold 6 fish for 45 credits"}
+{"tick": 1, "agent": "MinerBot", "action": "harvest", "message": "Harvested 5 iron"}
+{"tick": 1, "agent": "GovernorBot", "action": "move", "message": "Moved from market to dock"}
+{"tick": 2, "agent": "GovernorBot", "action": "harvest", "message": "Harvested 1 fish"}
+{"tick": 3, "agent": "MinerBot", "action": "harvest", "message": "Harvested 4 iron"}
+{"tick": 3, "agent": "GovernorBot", "action": "harvest", "message": "Harvested 5 fish"}
+{"tick": 5, "agent": "MinerBot", "action": "move", "message": "Moved from mine to market"}
+{"tick": 5, "agent": "GovernorBot", "action": "move", "message": "Moved from dock to market"}
+{"tick": 6, "agent": "MinerBot", "action": "place_order", "message": "Sold 11 iron for 156 credits"}
+{"tick": 6, "agent": "GovernorBot", "action": "place_order", "message": "Sold 6 fish for 45 credits"}
+{"tick": 7, "agent": "MinerBot", "action": "move", "message": "Moved from market to mine"}
+{"tick": 7, "agent": "GovernorBot", "action": "move", "message": "Moved from market to dock"}
+{"tick": 8, "agent": "MinerBot", "action": "harvest", "message": "Harvested 3 iron"}
+{"tick": 8, "agent": "GovernorBot", "action": "harvest", "message": "Harvested 1 fish"}
+{"tick": 9, "agent": "MinerBot", "action": "harvest", "message": "Harvested 4 iron"}
+{"tick": 10, "agent": "GovernorBot", "action": "harvest", "message": "Harvested 3 fish"}
+{"tick": 11, "agent": "MinerBot", "action": "harvest", "message": "Harvested 2 iron"}
+{"tick": 12, "agent": "GovernorBot", "action": "harvest", "message": "Harvested 2 fish"}
+{"tick": 13, "agent": "MinerBot", "action": "harvest", "message": "Harvested 5 iron"}
+{"tick": 14, "agent": "GovernorBot", "action": "move", "message": "Moved from dock to market"}
+{"tick": 15, "agent": "MinerBot", "action": "move", "message": "Moved from mine to market"}
+{"tick": 15, "agent": "GovernorBot", "action": "place_order", "message": "Sold 6 fish for 45 credits"}
+{"tick": 16, "agent": "MinerBot", "action": "place_order", "message": "Sold 14 iron for 199 credits"}
+{"tick": 16, "agent": "GovernorBot", "action": "move", "message": "Moved from market to dock"}
+{"tick": 17, "agent": "MinerBot", "action": "move", "message": "Moved from market to mine"}
+{"tick": 17, "agent": "GovernorBot", "action": "harvest", "message": "Harvested 5 fish"}
+{"tick": 18, "agent": "MinerBot", "action": "harvest", "message": "Harvested 3 iron"}
+{"tick": 19, "agent": "GovernorBot", "action": "move", "message": "Moved from dock to market"}
+{"tick": 20, "agent": "MinerBot", "action": "harvest", "message": "Harvested 1 iron"}
+{"tick": 20, "agent": "GovernorBot", "action": "place_order", "message": "Sold 5 fish for 38 credits"}
+{"tick": 21, "agent": "GovernorBot", "action": "move", "message": "Moved from market to dock"}
+{"tick": 22, "agent": "MinerBot", "action": "harvest", "message": "Harvested 5 iron"}
+{"tick": 22, "agent": "GovernorBot", "action": "harvest", "message": "Harvested 1 fish"}
+{"tick": 23, "agent": "GovernorBot", "action": "harvest", "message": "Harvested 3 fish"}
+{"tick": 24, "agent": "MinerBot", "action": "harvest", "message": "Harvested 1 iron"}
+{"tick": 25, "agent": "GovernorBot", "action": "harvest", "message": "Harvested 5 fish"}
+{"tick": 26, "agent": "MinerBot", "action": "move", "message": "Moved from mine to market"}
+{"tick": 27, "agent": "MinerBot", "action": "place_order", "message": "Sold 10 iron for 142 credits"}
+{"tick": 27, "agent": "GovernorBot", "action": "move", "message": "Moved from dock to market"}
+{"tick": 28, "agent": "MinerBot", "action": "move", "message": "Moved from market to mine"}
+{"tick": 28, "agent": "GovernorBot", "action": "place_order", "message": "Sold 9 fish for 68 credits"}
+{"tick": 29, "agent": "MinerBot", "action": "harvest", "message": "Harvested 2 iron"}
+{"tick": 29, "agent": "GovernorBot", "action": "move", "message": "Moved from market to dock"}
+{"tick": 30, "agent": "MinerBot", "action": "harvest", "message": "Harvested 4 iron"}
+{"tick": 30, "agent": "GovernorBot", "action": "harvest", "message": "Harvested 4 fish"}
+{"tick": 32, "agent": "MinerBot", "action": "harvest", "message": "Harvested 5 iron"}
+{"tick": 32, "agent": "GovernorBot", "action": "harvest", "message": "Harvested 2 fish"}
+{"tick": 34, "agent": "MinerBot", "action": "move", "message": "Moved from mine to market"}
+{"tick": 34, "agent": "GovernorBot", "action": "move", "message": "Moved from dock to market"}
+{"tick": 35, "agent": "MinerBot", "action": "place_order", "message": "Sold 11 iron for 156 credits"}
+{"tick": 35, "agent": "GovernorBot", "action": "place_order", "message": "Sold 6 fish for 45 credits"}
+{"tick": 36, "agent": "MinerBot", "action": "move", "message": "Moved from market to mine"}
+{"tick": 36, "agent": "GovernorBot", "action": "move", "message": "Moved from market to dock"}
+{"tick": 37, "agent": "MinerBot", "action": "harvest", "message": "Harvested 2 iron"}
+{"tick": 37, "agent": "GovernorBot", "action": "harvest", "message": "Harvested 4 fish"}
+{"tick": 38, "agent": "GovernorBot", "action": "harvest", "message": "Harvested 1 fish"}
+{"tick": 39, "agent": "MinerBot", "action": "harvest", "message": "Harvested 4 iron"}
+{"tick": 40, "agent": "GovernorBot", "action": "move", "message": "Moved from dock to market"}
+{"tick": 41, "agent": "MinerBot", "action": "harvest", "message": "Harvested 4 iron"}
+{"tick": 41, "agent": "GovernorBot", "action": "place_order", "message": "Sold 5 fish for 38 credits"}
+{"tick": 42, "agent": "GovernorBot", "action": "move", "message": "Moved from market to dock"}
+{"tick": 43, "agent": "MinerBot", "action": "move", "message": "Moved from mine to market"}
+{"tick": 43, "agent": "GovernorBot", "action": "harvest", "message": "Harvested 2 fish"}
+{"tick": 44, "agent": "MinerBot", "action": "place_order", "message": "Sold 10 iron for 142 credits"}
+{"tick": 45, "agent": "MinerBot", "action": "move", "message": "Moved from market to mine"}
+{"tick": 45, "agent": "GovernorBot", "action": "harvest", "message": "Harvested 3 fish"}
+{"tick": 46, "agent": "MinerBot", "action": "harvest", "message": "Harvested 3 iron"}
+{"tick": 47, "agent": "GovernorBot", "action": "move", "message": "Moved from dock to market"}
+{"tick": 48, "agent": "MinerBot", "action": "harvest", "message": "Harvested 2 iron"}
+{"tick": 48, "agent": "GovernorBot", "action": "place_order", "message": "Sold 5 fish for 38 credits"}
+{"tick": 49, "agent": "GovernorBot", "action": "move", "message": "Moved from market to dock"}

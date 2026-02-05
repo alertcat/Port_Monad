@@ -1,0 +1,90 @@
+{"agent": "MinerBot", "action": "move", "message": "Moved from dock to mine"}
+{"agent": "TraderBot", "action": "harvest", "message": "Harvested 5 fish"}
+{"agent": "GovernorBot", "action": "harvest", "message": "Harvested 1 fish"}
+{"agent": "MinerBot", "action": "harvest", "message": "Harvested 1 iron"}
+{"agent": "TraderBot", "action": "move", "message": "Moved from dock to market"}
+{"agent": "GovernorBot", "action": "harvest", "message": "Harvested 4 fish"}
+{"agent": "MinerBot", "action": "harvest", "message": "Harvested 2 iron"}
+{"agent": "TraderBot", "action": "place_order", "message": "Sold 5 fish for 38 credits"}
+{"agent": "GovernorBot", "action": "harvest", "message": "Harvested 4 fish"}
+{"agent": "MinerBot", "action": "harvest", "message": "Harvested 5 iron"}
+{"agent": "TraderBot", "action": "move", "message": "Moved from market to mine"}
+{"agent": "GovernorBot", "action": "harvest", "message": "Harvested 3 fish"}
+{"agent": "MinerBot", "action": "harvest", "message": "Harvested 2 iron"}
+{"agent": "TraderBot", "action": "harvest", "message": "Harvested 2 iron"}
+{"agent": "GovernorBot", "action": "move", "message": "Moved from dock to market"}
+{"agent": "MinerBot", "action": "move", "message": "Moved from mine to market"}
+{"agent": "TraderBot", "action": "harvest", "message": "Harvested 4 iron"}
+{"agent": "GovernorBot", "action": "place_order", "message": "Sold 12 fish for 91 credits"}
+{"agent": "MinerBot", "action": "place_order", "message": "Sold 10 iron for 142 credits"}
+{"agent": "TraderBot", "action": "move", "message": "Moved from mine to market"}
+{"agent": "GovernorBot", "action": "move", "message": "Moved from market to mine"}
+{"agent": "MinerBot", "action": "move", "message": "Moved from market to mine"}
+{"agent": "TraderBot", "action": "place_order", "message": "Sold 6 iron for 85 credits"}
+{"agent": "GovernorBot", "action": "harvest", "message": "Harvested 3 iron"}
+{"agent": "MinerBot", "action": "harvest", "message": "Harvested 4 iron"}
+{"agent": "TraderBot", "action": "move", "message": "Moved from market to mine"}
+{"agent": "GovernorBot", "action": "move", "message": "Moved from mine to market"}
+{"agent": "MinerBot", "action": "harvest", "message": "Harvested 4 iron"}
+{"agent": "TraderBot", "action": "harvest", "message": "Harvested 4 iron"}
+{"agent": "GovernorBot", "action": "place_order", "message": "Sold 3 iron for 42 credits"}
+{"agent": "MinerBot", "action": "harvest", "message": "Harvested 3 iron"}
+{"agent": "TraderBot", "action": "harvest", "message": "Harvested 3 iron"}
+{"agent": "GovernorBot", "action": "move", "message": "Moved from market to dock"}
+{"agent": "MinerBot", "action": "move", "message": "Moved from mine to market"}
+{"agent": "TraderBot", "action": "move", "message": "Moved from mine to market"}
+{"agent": "GovernorBot", "action": "harvest", "message": "Harvested 4 fish"}
+{"agent": "MinerBot", "action": "place_order", "message": "Sold 11 iron for 156 credits"}
+{"agent": "TraderBot", "action": "place_order", "message": "Sold 7 iron for 99 credits"}
+{"agent": "GovernorBot", "action": "harvest", "message": "Harvested 5 fish"}
+{"agent": "MinerBot", "action": "move", "message": "Moved from market to mine"}
+{"agent": "TraderBot", "action": "move", "message": "Moved from market to mine"}
+{"agent": "GovernorBot", "action": "move", "message": "Moved from dock to market"}
+{"agent": "MinerBot", "action": "harvest", "message": "Harvested 4 iron"}
+{"agent": "TraderBot", "action": "harvest", "message": "Harvested 1 iron"}
+{"agent": "GovernorBot", "action": "place_order", "message": "Sold 9 fish for 68 credits"}
+{"agent": "MinerBot", "action": "harvest", "message": "Harvested 3 iron"}
+{"agent": "TraderBot", "action": "harvest", "message": "Harvested 2 iron"}
+{"agent": "GovernorBot", "action": "move", "message": "Moved from market to dock"}
+{"agent": "MinerBot", "action": "move", "message": "Moved from mine to market"}
+{"agent": "TraderBot", "action": "harvest", "message": "Harvested 4 iron"}
+{"agent": "GovernorBot", "action": "harvest", "message": "Harvested 2 fish"}
+{"agent": "MinerBot", "action": "place_order", "message": "Sold 7 iron for 99 credits"}
+{"agent": "TraderBot", "action": "move", "message": "Moved from mine to market"}
+{"agent": "GovernorBot", "action": "harvest", "message": "Harvested 1 fish"}
+{"agent": "MinerBot", "action": "move", "message": "Moved from market to mine"}
+{"agent": "TraderBot", "action": "place_order", "message": "Sold 7 iron for 99 credits"}
+{"agent": "GovernorBot", "action": "harvest", "message": "Harvested 1 fish"}
+{"agent": "MinerBot", "action": "harvest", "message": "Harvested 5 iron"}
+{"agent": "TraderBot", "action": "move", "message": "Moved from market to mine"}
+{"agent": "GovernorBot", "action": "harvest", "message": "Harvested 2 fish"}
+{"agent": "MinerBot", "action": "harvest", "message": "Harvested 2 iron"}
+{"agent": "TraderBot", "action": "harvest", "message": "Harvested 1 iron"}
+{"agent": "GovernorBot", "action": "harvest", "message": "Harvested 4 fish"}
+{"agent": "MinerBot", "action": "move", "message": "Moved from mine to market"}
+{"agent": "TraderBot", "action": "harvest", "message": "Harvested 3 iron"}
+{"agent": "GovernorBot", "action": "move", "message": "Moved from dock to market"}
+{"agent": "MinerBot", "action": "place_order", "message": "Sold 7 iron for 99 credits"}
+{"agent": "TraderBot", "action": "harvest", "message": "Harvested 3 iron"}
+{"agent": "GovernorBot", "action": "place_order", "message": "Sold 10 fish for 76 credits"}
+{"agent": "MinerBot", "action": "move", "message": "Moved from market to mine"}
+{"agent": "TraderBot", "action": "move", "message": "Moved from mine to market"}
+{"agent": "GovernorBot", "action": "move", "message": "Moved from market to mine"}
+{"agent": "MinerBot", "action": "harvest", "message": "Harvested 3 iron"}
+{"agent": "TraderBot", "action": "place_order", "message": "Sold 7 iron for 99 credits"}
+{"agent": "GovernorBot", "action": "harvest", "message": "Harvested 4 iron"}
+{"agent": "MinerBot", "action": "harvest", "message": "Harvested 1 iron"}
+{"agent": "TraderBot", "action": "move", "message": "Moved from market to mine"}
+{"agent": "GovernorBot", "action": "move", "message": "Moved from mine to market"}
+{"agent": "MinerBot", "action": "harvest", "message": "Harvested 3 iron"}
+{"agent": "TraderBot", "action": "harvest", "message": "Harvested 5 iron"}
+{"agent": "GovernorBot", "action": "place_order", "message": "Sold 4 iron for 57 credits"}
+{"agent": "MinerBot", "action": "move", "message": "Moved from mine to market"}
+{"agent": "TraderBot", "action": "harvest", "message": "Harvested 2 iron"}
+{"agent": "GovernorBot", "action": "move", "message": "Moved from market to mine"}
+{"agent": "MinerBot", "action": "place_order", "message": "Sold 7 iron for 99 credits"}
+{"agent": "TraderBot", "action": "harvest", "message": "Harvested 1 iron"}
+{"agent": "GovernorBot", "action": "harvest", "message": "Harvested 3 iron"}
+{"agent": "MinerBot", "action": "move", "message": "Moved from market to mine"}
+{"agent": "TraderBot", "action": "move", "message": "Moved from mine to market"}
+{"agent": "GovernorBot", "action": "move", "message": "Moved from mine to market"}

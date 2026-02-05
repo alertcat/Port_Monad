@@ -1,0 +1,9 @@
+{
+  "address": "0xA725EEE1aA9D5874A2Bba70279773856dea10b7c",
+  "tx_hash": "a3395ab65973a00d5bd5708010c179ef4ec5e2293eea42204866c0e48ad81a6c",
+  "deployer": "0x5134b47c614c7884Ad6cdebB99C7846Daf06b30C",
+  "chain_id": 10143,
+  "block_number": 10465421,
+  "gas_used": 1358677,
+  "compiler": "hardhat-0.8.20-no-optimizer"
+}
