@@ -497,22 +497,18 @@ def run_simulation(rounds: int = 10):
     print("#" + " "*8 + "Combat | Trade | Politics | Exploration" + " "*11 + "#")
     print("#"*70)
     
-    # Reset world
-    print("\n🔄 Resetting world...")
-    api_post("/debug/reset_world")
-    print("   Tick reset to 0")
-    
-    # Delete test agents
-    print("🧹 Cleaning test agents...")
-    result = api_post("/debug/delete_test_agents")
-    deleted = result.get("deleted", [])
-    if deleted:
-        for a in deleted:
-            print(f"   Deleted: {a['name']} ({a['wallet']})")
-    
-    # Reset credits
-    print("💰 Resetting all credits to 1000...")
-    api_post("/debug/reset_all_credits?credits=1000")
+    # Full reset: clears DB, keeps only 3 real agents, resets everything
+    print("\n🔄 Full reset (tick=0, prices=default, 3 agents, DB cleaned)...")
+    result = api_post("/debug/full_reset")
+    if result.get("success"):
+        print(f"   ✅ {result.get('message', 'Reset complete')}")
+    else:
+        # Fallback to individual resets
+        print(f"   ⚠️ Full reset failed: {result.get('error', '?')}")
+        print("   Trying individual resets...")
+        api_post("/debug/reset_world")
+        api_post("/debug/delete_test_agents")
+        api_post("/debug/reset_all_credits?credits=1000")
     
     # Initial status
     print_status()

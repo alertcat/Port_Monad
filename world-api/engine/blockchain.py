@@ -52,6 +52,10 @@ class WorldGateClient:
     
     def is_active_entry(self, wallet: str) -> bool:
         """Check if wallet has active entry in the world"""
+        # In DEBUG_MODE, skip on-chain check (for local testing)
+        if os.getenv("DEBUG_MODE", "").lower() in ("1", "true", "yes"):
+            return True
+        
         if not self.contract:
             print("Warning: No contract address, skipping on-chain check")
             return True  # Allow if no contract configured

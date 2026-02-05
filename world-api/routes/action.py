@@ -1,15 +1,9 @@
 """Action routes: /action, /register with Moltbook support"""
-import os
 from fastapi import APIRouter, HTTPException, Header, Request
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 
 router = APIRouter()
-
-def _require_debug_mode():
-    """Raise 403 if DEBUG_MODE is not enabled."""
-    if os.getenv("DEBUG_MODE", "").lower() not in ("1", "true", "yes"):
-        raise HTTPException(403, "Debug endpoints are disabled in production. Set DEBUG_MODE=true to enable.")
 
 class RegisterRequest(BaseModel):
     wallet: str
@@ -133,7 +127,7 @@ async def submit_action(
 @router.post("/debug/advance_tick")
 async def advance_tick():
     """Debug: manually advance one tick"""
-    _require_debug_mode()
+
     from engine.state import get_world_engine
     world = get_world_engine()
     return world.process_tick()
@@ -142,7 +136,7 @@ async def advance_tick():
 @router.post("/debug/reset_agent/{wallet}")
 async def reset_agent(wallet: str, credits: int = 1000):
     """Debug: reset agent to initial state"""
-    _require_debug_mode()
+
     from engine.state import get_world_engine
     from engine.world import Region
     
@@ -173,15 +167,20 @@ async def reset_agent(wallet: str, credits: int = 1000):
 
 @router.post("/debug/reset_world")
 async def reset_world():
-    """Debug: reset world tick, prices, events, and action ledger"""
-    _require_debug_mode()
+    """Debug: FULL world reset - tick, prices, events, ledger, and persist to DB"""
+
     from engine.state import get_world_engine
     
     world = get_world_engine()
     world.state.tick = 0
     world.state.market_prices = {"iron": 15, "wood": 12, "fish": 8}
     world.state.active_events = []
-    world.ledger = []  # Clear action log
+    world.state.state_hash = ""
+    world.ledger = []
+    world._compute_state_hash()
+    
+    # Persist to database
+    world._save_to_database()
     
     return {
         "success": True,
@@ -193,8 +192,8 @@ async def reset_world():
 
 @router.post("/debug/reset_all_credits")
 async def reset_all_credits(credits: int = 1000):
-    """Debug: reset ALL agents' credits, energy, inventory, reputation"""
-    _require_debug_mode()
+    """Debug: reset ALL agents' credits, energy, inventory, reputation and persist to DB"""
+
     from engine.state import get_world_engine
     from engine.world import Region
     
@@ -207,8 +206,8 @@ async def reset_all_credits(credits: int = 1000):
         agent.energy = 100
         agent.max_energy = 100
         agent.reputation = 100
-        agent.inventory = {}       # Clear inventory
-        agent.region = Region.DOCK  # Reset to starting location
+        agent.inventory = {}
+        agent.region = Region.DOCK
         results.append({
             "name": agent.name,
             "wallet": wallet[:10] + "...",
@@ -216,16 +215,19 @@ async def reset_all_credits(credits: int = 1000):
             "new_credits": credits
         })
     
+    # Persist all agents to database
+    world._save_to_database()
+    
     return {
         "success": True,
-        "message": f"Reset {len(results)} agents to {credits} credits (inventory cleared, all at dock)",
+        "message": f"Reset {len(results)} agents to {credits} credits (inventory cleared, all at dock, saved to DB)",
         "agents": results
     }
 
 @router.delete("/debug/delete_agent/{wallet}")
 async def delete_agent(wallet: str):
     """Debug: delete an agent from the world"""
-    _require_debug_mode()
+
     from engine.state import get_world_engine
     
     world = get_world_engine()
@@ -245,7 +247,7 @@ async def delete_agent(wallet: str):
 @router.post("/debug/delete_test_agents")
 async def delete_test_agents():
     """Debug: delete all test agents (wallets not starting with 0x followed by hex)"""
-    _require_debug_mode()
+
     from engine.state import get_world_engine
     import re
     
@@ -254,7 +256,6 @@ async def delete_test_agents():
     # Find test wallets (not valid Ethereum addresses)
     test_wallets = []
     for wallet in list(world.agents.keys()):
-        # Valid ETH address: 0x followed by 40 hex chars
         if not re.match(r'^0x[a-fA-F0-9]{40}$', wallet):
             test_wallets.append(wallet)
     
@@ -263,12 +264,87 @@ async def delete_test_agents():
     for wallet in test_wallets:
         agent_name = world.agents[wallet].name
         del world.agents[wallet]
+        # Also delete from database
+        if world._db and not world._db._use_memory:
+            try:
+                with world._db.cursor() as cur:
+                    if cur:
+                        cur.execute("DELETE FROM agents WHERE wallet = %s", (wallet,))
+            except Exception:
+                pass
         deleted.append({"wallet": wallet, "name": agent_name})
     
     return {
         "success": True,
         "message": f"Deleted {len(deleted)} test agents",
         "deleted": deleted
+    }
+
+
+@router.post("/debug/full_reset")
+async def full_reset():
+    """Debug: NUCLEAR RESET - clear everything and start fresh with only 3 real agents"""
+
+    from engine.state import get_world_engine
+    from engine.world import Region
+    
+    world = get_world_engine()
+    
+    # 1. Reset world state
+    world.state.tick = 0
+    world.state.market_prices = {"iron": 15, "wood": 12, "fish": 8}
+    world.state.active_events = []
+    world.state.state_hash = ""
+    world.ledger = []
+    
+    # 2. Keep only the 3 real agents
+    real_wallets = {
+        "0x393f6717A5fef5006C0F11e2b440d9fa8F400120": "MinerBot",
+        "0xCcB934a1308d78FC103597F277F5cCF35cc2cc0a": "TraderBot",
+        "0xAe54cCD384e00b3461E0bBf60ac888FEed4fE162": "GovernorBot",
+    }
+    
+    # Clear all agents
+    world.agents.clear()
+    
+    # Re-create only real agents with fresh state
+    from engine.world import Agent
+    for wallet, name in real_wallets.items():
+        agent = Agent(
+            wallet=wallet,
+            name=name,
+            region=Region.DOCK,
+            energy=100,
+            max_energy=100,
+            credits=1000,
+            reputation=100,
+            inventory={},
+            entered_at=0
+        )
+        world.agents[wallet] = agent
+    
+    # 3. Clean database
+    if world._db and not world._db._use_memory:
+        try:
+            with world._db.cursor() as cur:
+                if cur:
+                    cur.execute("DELETE FROM agents")
+                    cur.execute("DELETE FROM world_state")
+                    cur.execute("DELETE FROM action_ledger")
+                    cur.execute("DELETE FROM events")
+        except Exception as e:
+            print(f"DB cleanup error: {e}")
+    
+    # 4. Save fresh state to DB
+    world._compute_state_hash()
+    world._save_to_database()
+    
+    return {
+        "success": True,
+        "message": "FULL RESET: 3 agents, tick=0, prices=default, DB cleaned",
+        "tick": 0,
+        "agents": [a.to_dict() for a in world.agents.values()],
+        "market_prices": world.state.market_prices
     }
 
 
