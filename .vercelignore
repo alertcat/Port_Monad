@@ -1,0 +1,12 @@
+# Ignore contracts (Hardhat project)
+contracts/
+contracts/node_modules/
+
+# Ignore other unnecessary files
+*.md
+*.docx
+agents/
+scripts/
+*.json
+!package.json
+!vercel.json

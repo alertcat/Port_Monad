@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "world-api/app.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "world-api/app.py"
+    }
+  ],
+  "installCommand": "pip install -r world-api/requirements.txt",
+  "outputDirectory": ".",
+  "ignoreCommand": "exit 0"
+}
