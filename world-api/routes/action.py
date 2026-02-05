@@ -180,8 +180,9 @@ async def reset_world():
 
 @router.post("/debug/reset_all_credits")
 async def reset_all_credits(credits: int = 1000):
-    """Debug: reset ALL agents' credits to specified amount"""
+    """Debug: reset ALL agents' credits, energy, inventory, reputation"""
     from engine.state import get_world_engine
+    from engine.world import Region
     
     world = get_world_engine()
     
@@ -189,7 +190,11 @@ async def reset_all_credits(credits: int = 1000):
     for wallet, agent in world.agents.items():
         old_credits = agent.credits
         agent.credits = credits
-        agent.energy = 100  # Also reset energy
+        agent.energy = 100
+        agent.max_energy = 100
+        agent.reputation = 100
+        agent.inventory = {}       # Clear inventory
+        agent.region = Region.DOCK  # Reset to starting location
         results.append({
             "name": agent.name,
             "wallet": wallet[:10] + "...",
@@ -199,7 +204,7 @@ async def reset_all_credits(credits: int = 1000):
     
     return {
         "success": True,
-        "message": f"Reset {len(results)} agents to {credits} credits",
+        "message": f"Reset {len(results)} agents to {credits} credits (inventory cleared, all at dock)",
         "agents": results
     }
 

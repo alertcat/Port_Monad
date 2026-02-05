@@ -136,16 +136,15 @@ class MinerBotLogic:
                     "want_amount": 3
                 }}
         
-        # Priority 4: Raid (Combat)
-        if energy >= 25 and reputation > 50 and random.random() < cls.RAID_CHANCE:
-            nearby_weak = [a for a in all_agents 
-                           if a["region"] == region 
-                           and a["wallet"] != my_wallet
-                           and region != "market"
-                           and a.get("credits", 0) > 200
-                           and a.get("reputation", 100) < reputation]
-            if nearby_weak:
-                target = min(nearby_weak, key=lambda a: a.get("reputation", 100))
+        # Priority 4: Raid (Combat) - attack nearby agents for their credits
+        if energy >= 25 and random.random() < cls.RAID_CHANCE:
+            raid_targets = [a for a in all_agents 
+                            if a["region"] == region 
+                            and a["wallet"] != my_wallet
+                            and region != "market"
+                            and a.get("credits", 0) > 200]
+            if raid_targets:
+                target = max(raid_targets, key=lambda a: a.get("credits", 0))
                 cls.log.info(f"[COMBAT] Raiding {target['name']} (credits: {target['credits']}, rep: {target.get('reputation', '?')})")
                 return {"action": "raid", "params": {"target": target["wallet"]}}
         
@@ -417,17 +416,17 @@ class GovernorBotLogic:
                             "want_amount": 3
                         }}
         
-        # Priority 5: Justice raid
+        # Priority 5: Justice raid - punish agents with lower reputation
         if energy >= 25 and random.random() < cls.JUSTICE_RAID_CHANCE:
-            bad_actors = [a for a in all_agents
-                          if a["region"] == region
-                          and a["wallet"] != my_wallet
-                          and a.get("reputation", 100) < 50
-                          and a.get("credits", 0) > 100
-                          and region != "market"]
-            if bad_actors:
-                target = min(bad_actors, key=lambda a: a.get("reputation", 100))
-                cls.log.info(f"[COMBAT/JUSTICE] Raiding bad actor {target['name']} (rep: {target.get('reputation', '?')})")
+            raid_targets = [a for a in all_agents
+                            if a["region"] == region
+                            and a["wallet"] != my_wallet
+                            and a.get("reputation", 100) < reputation
+                            and a.get("credits", 0) > 100
+                            and region != "market"]
+            if raid_targets:
+                target = min(raid_targets, key=lambda a: a.get("reputation", 100))
+                cls.log.info(f"[COMBAT/JUSTICE] Raiding {target['name']} (rep: {target.get('reputation', '?')}, credits: {target['credits']})")
                 return {"action": "raid", "params": {"target": target["wallet"]}}
         
         # Priority 6: Start patrol
@@ -560,6 +559,46 @@ def run_simulation(rounds: int = 10):
         print_status()
         time.sleep(0.5)
     
+    # ---- FINAL SETTLEMENT: Convert all inventory to credits ----
+    print("\n" + "="*70)
+    print("💎 FINAL SETTLEMENT - Converting inventory to credits")
+    print("="*70)
+    
+    world_state = get_world_state()
+    prices = world_state.get("market_prices", {})
+    
+    for name, wallet in REAL_AGENTS.items():
+        agent = get_agent_state(wallet)
+        if "error" in agent:
+            continue
+        
+        inventory = agent.get("inventory", {})
+        total_value = 0
+        
+        for resource, qty in inventory.items():
+            if qty > 0:
+                price = prices.get(resource, 10)
+                value = int(price * qty * 0.95)  # 5% tax
+                total_value += value
+                print(f"   {name}: {qty} {resource} × {price} = {value} credits (after 5% tax)")
+        
+        if total_value > 0:
+            # Move to market and sell everything
+            submit_action(wallet, "move", {"target": "market"})
+            time.sleep(0.2)
+            for resource, qty in inventory.items():
+                if qty > 0:
+                    result = submit_action(wallet, "place_order", {
+                        "resource": resource, "side": "sell", "quantity": qty
+                    })
+                    if result.get("success"):
+                        print(f"   ✅ {name}: Sold {qty} {resource}")
+                    time.sleep(0.2)
+        else:
+            print(f"   {name}: No inventory to settle")
+    
+    print("="*70)
+    
     # Final summary
     print("\n" + "#"*70)
     print("#" + " "*22 + "SIMULATION SUMMARY" + " "*18 + "#")
@@ -574,7 +613,7 @@ def run_simulation(rounds: int = 10):
     print(f"   👀 Watch:      {stats['watch']}")
     print(f"   📍 Total:      {sum(stats.values())}")
     
-    print(f"\n🏆 Final Standings:")
+    print(f"\n🏆 Final Standings (after settlement):")
     print_status()
     
     print("#"*70 + "\n")

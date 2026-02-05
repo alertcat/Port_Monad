@@ -159,17 +159,17 @@ class GovernorBot:
                             "want_amount": 3
                         }}
         
-        # Priority 5: Justice raid - punish low-reputation agents nearby
+        # Priority 5: Justice raid - punish agents with lower reputation
         if energy >= 25 and random.random() < self.JUSTICE_RAID_CHANCE:
-            bad_actors = [a for a in all_agents
-                          if a["region"] == region
-                          and a["wallet"] != my_wallet
-                          and a.get("reputation", 100) < 50
-                          and a.get("credits", 0) > 100
-                          and region != "market"]
-            if bad_actors:
-                target = min(bad_actors, key=lambda a: a.get("reputation", 100))
-                log.info(f"[COMBAT/JUSTICE] Raiding bad actor {target['name']} (rep: {target.get('reputation', '?')})")
+            raid_targets = [a for a in all_agents
+                            if a["region"] == region
+                            and a["wallet"] != my_wallet
+                            and a.get("reputation", 100) < reputation
+                            and a.get("credits", 0) > 100
+                            and region != "market"]
+            if raid_targets:
+                target = min(raid_targets, key=lambda a: a.get("reputation", 100))
+                log.info(f"[COMBAT/JUSTICE] Raiding {target['name']} (rep: {target.get('reputation', '?')}, credits: {target['credits']})")
                 return {"action": "raid", "params": {"target": target["wallet"]}}
         
         # Priority 6: Start patrol (Exploration)

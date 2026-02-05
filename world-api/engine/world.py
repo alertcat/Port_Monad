@@ -256,6 +256,54 @@ class WorldEngine:
                 {}, success, message, self.state.state_hash
             )
     
+    def _update_market_prices(self, effects: dict):
+        """
+        Update market prices based on supply/demand dynamics.
+        
+        Mechanics:
+        - Track total resources sold/bought per tick
+        - High supply (lots of selling) → price drops
+        - Low supply (lots of buying) → price rises
+        - Random fluctuation ±5%
+        - Event modifiers (trade_boom = +20%)
+        - Prices clamped to min 3, max 50
+        """
+        import random as rng
+        
+        base_prices = {"iron": 15, "wood": 12, "fish": 8}
+        
+        # Count total inventory of each resource across all agents (supply indicator)
+        total_supply = {}
+        for agent in self.agents.values():
+            for res, qty in agent.inventory.items():
+                total_supply[res] = total_supply.get(res, 0) + qty
+        
+        for resource in self.state.market_prices:
+            current = self.state.market_prices[resource]
+            base = base_prices.get(resource, 10)
+            supply = total_supply.get(resource, 0)
+            
+            # Supply pressure: more supply → lower price
+            # Each unit of supply pushes price down slightly
+            supply_factor = max(0.7, 1.0 - supply * 0.01)
+            
+            # Random fluctuation ±8%
+            noise = rng.uniform(0.92, 1.08)
+            
+            # Mean reversion toward base price (weak pull)
+            reversion = 1.0 + (base - current) * 0.02
+            
+            # Event modifier
+            event_mod = effects.get("price_modifier", 1.0)
+            
+            # Calculate new price
+            new_price = current * supply_factor * noise * reversion * event_mod
+            
+            # Clamp
+            new_price = max(3, min(50, int(round(new_price))))
+            
+            self.state.market_prices[resource] = new_price
+    
     def process_tick(self) -> dict:
         """Process one tick"""
         from engine.events import EventSystem
@@ -285,25 +333,29 @@ class WorldEngine:
         # 4. Get event effects
         effects = EventSystem.get_active_effects(self.state.active_events)
         
-        # 5. Natural AP recovery (affected by events)
+        # 5. Update market prices based on supply/demand
+        self._update_market_prices(effects)
+        
+        # 6. Natural AP recovery (affected by events)
         base_recovery = 5
         actual_recovery = int(base_recovery * effects["ap_recovery_modifier"])
         for agent in self.agents.values():
             agent.energy = min(agent.max_energy, agent.energy + actual_recovery)
         
-        # 6. Advance tick
+        # 7. Advance tick
         self.state.tick += 1
         
-        # 7. Recompute state hash
+        # 8. Recompute state hash
         self._compute_state_hash()
         
-        # 8. Persist to database
+        # 9. Persist to database
         self._save_to_database()
         
         return {
             "tick": self.state.tick,
             "state_hash": self.state.state_hash,
             "agent_count": len(self.agents),
+            "market_prices": dict(self.state.market_prices),
             "new_events": [e.to_dict() for e in new_events] if new_events else [],
             "ap_recovery": actual_recovery
         }

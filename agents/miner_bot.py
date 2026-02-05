@@ -101,17 +101,15 @@ class MinerBot:
                     "want_amount": 3
                 }}
         
-        # Priority 4: Raid (Combat) - attack weak nearby agents
-        if energy >= 25 and reputation > 50 and random.random() < self.RAID_CHANCE:
-            # Find weaker agents in same non-market region
-            nearby_weak = [a for a in all_agents 
-                           if a["region"] == region 
-                           and a["wallet"] != my_wallet
-                           and region != "market"
-                           and a.get("credits", 0) > 200
-                           and a.get("reputation", 100) < reputation]
-            if nearby_weak:
-                target = min(nearby_weak, key=lambda a: a.get("reputation", 100))
+        # Priority 4: Raid (Combat) - attack nearby agents for their credits
+        if energy >= 25 and random.random() < self.RAID_CHANCE:
+            raid_targets = [a for a in all_agents 
+                            if a["region"] == region 
+                            and a["wallet"] != my_wallet
+                            and region != "market"
+                            and a.get("credits", 0) > 200]
+            if raid_targets:
+                target = max(raid_targets, key=lambda a: a.get("credits", 0))
                 log.info(f"[COMBAT] Raiding {target['name']} (credits: {target['credits']}, rep: {target.get('reputation', '?')})")
                 return {"action": "raid", "params": {"target": target["wallet"]}}
         
