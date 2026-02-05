@@ -1,9 +1,15 @@
 """Action routes: /action, /register with Moltbook support"""
+import os
 from fastapi import APIRouter, HTTPException, Header, Request
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 
 router = APIRouter()
+
+def _require_debug_mode():
+    """Raise 403 if DEBUG_MODE is not enabled."""
+    if os.getenv("DEBUG_MODE", "").lower() not in ("1", "true", "yes"):
+        raise HTTPException(403, "Debug endpoints are disabled in production. Set DEBUG_MODE=true to enable.")
 
 class RegisterRequest(BaseModel):
     wallet: str
@@ -127,6 +133,7 @@ async def submit_action(
 @router.post("/debug/advance_tick")
 async def advance_tick():
     """Debug: manually advance one tick"""
+    _require_debug_mode()
     from engine.state import get_world_engine
     world = get_world_engine()
     return world.process_tick()
@@ -135,6 +142,7 @@ async def advance_tick():
 @router.post("/debug/reset_agent/{wallet}")
 async def reset_agent(wallet: str, credits: int = 1000):
     """Debug: reset agent to initial state"""
+    _require_debug_mode()
     from engine.state import get_world_engine
     from engine.world import Region
     
@@ -165,22 +173,28 @@ async def reset_agent(wallet: str, credits: int = 1000):
 
 @router.post("/debug/reset_world")
 async def reset_world():
-    """Debug: reset world tick counter"""
+    """Debug: reset world tick, prices, events, and action ledger"""
+    _require_debug_mode()
     from engine.state import get_world_engine
     
     world = get_world_engine()
     world.state.tick = 0
+    world.state.market_prices = {"iron": 15, "wood": 12, "fish": 8}
+    world.state.active_events = []
+    world.ledger = []  # Clear action log
     
     return {
         "success": True,
-        "message": "World tick reset to 0",
-        "tick": world.state.tick
+        "message": "World fully reset: tick=0, prices=default, events cleared",
+        "tick": world.state.tick,
+        "market_prices": world.state.market_prices
     }
 
 
 @router.post("/debug/reset_all_credits")
 async def reset_all_credits(credits: int = 1000):
     """Debug: reset ALL agents' credits, energy, inventory, reputation"""
+    _require_debug_mode()
     from engine.state import get_world_engine
     from engine.world import Region
     
@@ -211,6 +225,7 @@ async def reset_all_credits(credits: int = 1000):
 @router.delete("/debug/delete_agent/{wallet}")
 async def delete_agent(wallet: str):
     """Debug: delete an agent from the world"""
+    _require_debug_mode()
     from engine.state import get_world_engine
     
     world = get_world_engine()
@@ -230,6 +245,7 @@ async def delete_agent(wallet: str):
 @router.post("/debug/delete_test_agents")
 async def delete_test_agents():
     """Debug: delete all test agents (wallets not starting with 0x followed by hex)"""
+    _require_debug_mode()
     from engine.state import get_world_engine
     import re
     
@@ -316,6 +332,23 @@ async def list_agents():
         "count": len(agents),
         "agents": agents
     }
+
+@router.get("/actions/recent")
+async def recent_actions(limit: int = 20):
+    """Get recent actions across all agents (for dashboard)"""
+    from engine.state import get_world_engine
+    
+    world = get_world_engine()
+    
+    # Get the most recent actions from the ledger
+    actions = world.ledger[-limit:] if world.ledger else []
+    actions = list(reversed(actions))  # newest first
+    
+    return {
+        "count": len(actions),
+        "actions": actions
+    }
+
 
 @router.get("/cashout/estimate/{credits}")
 async def cashout_estimate(credits: int):

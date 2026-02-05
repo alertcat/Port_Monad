@@ -19,8 +19,15 @@ import random
 import requests
 import logging
 
+# Fix Windows encoding
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 # API endpoint
 API_URL = os.getenv("API_URL", "http://localhost:8000")
+
+# NOTE: Server must be started with DEBUG_MODE=true for /debug/* endpoints to work
+# e.g.: cmd /c "set DEBUG_MODE=true && set MOLTBOOK_DRY_RUN=true && python app.py"
 
 # Real agent wallets (on-chain)
 REAL_AGENTS = {

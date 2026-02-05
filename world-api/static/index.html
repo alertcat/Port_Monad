@@ -271,6 +271,23 @@
             text-decoration: none;
         }
         
+        /* Action type badges */
+        .action-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .action-harvest { background: #2e7d32; color: #fff; }
+        .action-move { background: #1565c0; color: #fff; }
+        .action-place_order { background: #6a1b9a; color: #fff; }
+        .action-rest { background: #455a64; color: #fff; }
+        .action-raid { background: #c62828; color: #fff; }
+        .action-negotiate { background: #e65100; color: #fff; }
+        .action-register { background: #00695c; color: #fff; }
+        
         /* Loading Spinner */
         .loading {
             text-align: center;
@@ -437,7 +454,7 @@
             <p>
                 <a href="/docs">API Docs</a> • 
                 <a href="/skill.md">Skill File</a> • 
-                Contract: <code>0xA725EEE1aA9D5874A2Bba70279773856dea10b7c</code>
+                Contract: <code>0x7872021579a2EcB381764D5bb5DF724e0cDD1bD4</code>
             </p>
             <p style="margin-top: 10px;">Auto-refreshes every 5 seconds</p>
         </footer>
@@ -510,6 +527,48 @@
                     }).join('');
                 } else {
                     leaderboardDiv.innerHTML = '<div class="empty">No agents registered yet</div>';
+                }
+                
+                // Fetch recent actions
+                try {
+                    const actionsRes = await fetch(`${API_URL}/actions/recent?limit=15`);
+                    const actionsData = await actionsRes.json();
+                    
+                    const actionsDiv = document.getElementById('actions');
+                    if (actionsData.actions && actionsData.actions.length > 0) {
+                        actionsDiv.innerHTML = actionsData.actions.map(a => {
+                            const statusClass = a.success ? 'success' : 'fail';
+                            const statusIcon = a.success ? '✅' : '❌';
+                            const actionClass = `action-${a.action}`;
+                            const walletShort = (a.wallet || '').substring(0, 8) + '...';
+                            const time = a.timestamp ? new Date(a.timestamp).toLocaleTimeString() : '';
+                            
+                            const icons = {
+                                'harvest': '⛏️', 'move': '🚶', 'place_order': '📈',
+                                'rest': '😴', 'raid': '⚔️', 'negotiate': '🤝', 'register': '📝'
+                            };
+                            const icon = icons[a.action] || '🔹';
+                            
+                            return `
+                                <div class="action-item ${statusClass}">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <div>
+                                            ${icon} <span class="action-badge ${actionClass}">${a.action}</span>
+                                            <span class="agent" style="margin-left: 8px;">${walletShort}</span>
+                                        </div>
+                                        <span class="time">T${a.tick} ${time}</span>
+                                    </div>
+                                    <div style="margin-top: 6px; color: #aaa; font-size: 0.9em;">
+                                        ${statusIcon} ${a.message || ''}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    } else {
+                        actionsDiv.innerHTML = '<div class="empty">Waiting for agent actions... (run test script)</div>';
+                    }
+                } catch (e) {
+                    console.error('Error fetching actions:', e);
                 }
                 
             } catch (error) {
