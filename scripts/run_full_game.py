@@ -462,12 +462,14 @@ ACTIONS (respond with EXACTLY ONE JSON object, nothing else):
 4. REST: {{"action":"rest","params":{{}}}}
    Cost: 0 AP. Recovers energy.
 
-5. RAID: {{"action":"raid","params":{{"target_wallet":"0xABC123..."}}}}
+5. RAID: {{"action":"raid","params":{{"target":"0xABC123..."}}}}
    Cost: 25 AP. COMBAT! Steal items from target. Must be in same NON-market region.
    Win chance higher if you have more reputation. Winner gets items, loser loses items.
+   "target" must be the FULL wallet address (0x...) of an agent in your region.
 
-6. NEGOTIATE: {{"action":"negotiate","params":{{"target_wallet":"0xABC123...","offer_type":"credits","offer_amount":50,"request_resource":"iron","request_amount":3}}}}
+6. NEGOTIATE: {{"action":"negotiate","params":{{"target":"0xABC123...","offer_type":"credits","offer_amount":50,"request_resource":"iron","request_amount":3}}}}
    Cost: 15 AP. Trade deal with another agent. Must be in same region.
+   "target" must be the FULL wallet address (0x...) of an agent in your region.
 
 PRICES: Iron={prices.get('iron',15)}, Wood={prices.get('wood',12)}, Fish={prices.get('fish',8)}
 ACTIVE EVENTS: {events_str}
@@ -572,9 +574,9 @@ def _parse_llm_json(response):
         params = d.get("params", {})
         if not action:
             return None
-        # Normalize common LLM mistakes
+
+        # ---- Normalize move ----
         if action == "move" and "target" not in params:
-            # LLM might put region at top level
             for key in ["region", "destination", "to", "location"]:
                 if key in d:
                     params["target"] = d[key]
@@ -582,11 +584,29 @@ def _parse_llm_json(response):
                 if key in params:
                     params["target"] = params.pop(key)
                     break
+
+        # ---- Normalize place_order ----
         if action == "place_order":
             if "quantity" in params:
                 params["quantity"] = int(params["quantity"])
             if "side" not in params:
                 params["side"] = "sell"
+
+        # ---- Normalize raid / negotiate ----
+        # Engine expects params["target"], but LLM might use "target_wallet"
+        if action in ("raid", "negotiate"):
+            if "target" not in params:
+                for key in ["target_wallet", "target_address", "wallet", "agent"]:
+                    val = params.get(key) or d.get(key)
+                    if val and isinstance(val, str) and val.startswith("0x"):
+                        params["target"] = val
+                        params.pop(key, None)
+                        break
+            # Validate: target must look like an Ethereum address
+            t = params.get("target", "")
+            if not (isinstance(t, str) and t.startswith("0x") and len(t) >= 10):
+                return None  # invalid target, fall back to rule-based
+
         return {"action": action, "params": params}
     except:
         return None
@@ -608,14 +628,14 @@ def _fallback_action(name, state, world_state, nearby=None):
     if name == "MinerBot" and energy >= 25 and region != "market" and nearby:
         richest = max(nearby, key=lambda n: n["items"])
         if richest["items"] >= 2:
-            return {"action": "raid", "params": {"target_wallet": richest["wallet"]}}
+            return {"action": "raid", "params": {"target": richest["wallet"]}}
 
     # TraderBot: negotiate if someone nearby
     if name == "TraderBot" and energy >= 15 and nearby and inv_total > 0:
         target = nearby[0]
         best_res = max(inventory, key=lambda k: inventory[k])
         return {"action": "negotiate", "params": {
-            "target_wallet": target["wallet"],
+            "target": target["wallet"],
             "offer_type": "resource", "offer_resource": best_res,
             "offer_amount": min(2, inventory[best_res]),
             "request_resource": "credits", "request_amount": 30
@@ -625,7 +645,7 @@ def _fallback_action(name, state, world_state, nearby=None):
     if name == "GovernorBot" and energy >= 25 and region != "market" and nearby:
         low_rep = [n for n in nearby if n["reputation"] < 95]
         if low_rep:
-            return {"action": "raid", "params": {"target_wallet": low_rep[0]["wallet"]}}
+            return {"action": "raid", "params": {"target": low_rep[0]["wallet"]}}
 
     # At market with items -> sell biggest stack
     if region == "market" and inv_total > 0:
