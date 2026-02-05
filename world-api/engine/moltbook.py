@@ -4,9 +4,17 @@ Moltbook Integration - Post world updates and agent comments
 Usage:
     from engine.moltbook import MoltbookClient
     
+    # Production mode (actually posts)
     client = MoltbookClient(api_key="your_api_key")
+    
+    # Test mode (only prints, no actual posting)
+    client = MoltbookClient(api_key="your_api_key", dry_run=True)
+    
     post_id = client.post_tick_digest(tick=10, state=world_state)
     client.post_comment(post_id, "MinerBot checking in!")
+
+Environment variables:
+    MOLTBOOK_DRY_RUN=true   # Enable dry run mode globally
 """
 import os
 import httpx
@@ -16,13 +24,18 @@ from datetime import datetime
 # IMPORTANT: Always use www.moltbook.com to avoid 307 redirect issues
 MOLTBOOK_API = "https://www.moltbook.com/api/v1"
 
+# Global dry run mode - set via env var or code
+DRY_RUN_MODE = os.getenv("MOLTBOOK_DRY_RUN", "false").lower() in ("true", "1", "yes")
+
 class MoltbookClient:
     """Client for posting to Moltbook"""
     
-    def __init__(self, api_key: str = None, agent_name: str = "PortMonad"):
+    def __init__(self, api_key: str = None, agent_name: str = "PortMonad", dry_run: bool = None):
         self.api_key = api_key or os.getenv("MOLTBOOK_API_KEY", "")
         self.agent_name = agent_name
         self._client = None
+        # dry_run can be set per-instance or globally via env var
+        self.dry_run = dry_run if dry_run is not None else DRY_RUN_MODE
     
     @property
     def client(self) -> httpx.Client:
@@ -44,8 +57,20 @@ class MoltbookClient:
     def post(self, title: str, content: str, submolt: str = "general") -> Optional[str]:
         """
         Create a post on Moltbook
-        Returns: post_id or None
+        Returns: post_id or None (or fake_post_id in dry_run mode)
         """
+        # DRY RUN MODE - just print, don't actually post
+        if self.dry_run:
+            fake_id = f"dry_run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            print("\n" + "="*60)
+            print(f"🧪 [DRY RUN] Moltbook POST (not actually sent)")
+            print("="*60)
+            print(f"📝 Title: {title}")
+            print(f"📂 Submolt: {submolt}")
+            print(f"📄 Content:\n{content}")
+            print("="*60 + "\n")
+            return fake_id
+        
         if not self.is_configured():
             print("Warning: Moltbook API key not configured")
             return None
@@ -78,6 +103,16 @@ class MoltbookClient:
         Add a comment to a post
         Returns: True if successful
         """
+        # DRY RUN MODE - just print, don't actually comment
+        if self.dry_run:
+            print("\n" + "-"*50)
+            print(f"🧪 [DRY RUN] Moltbook COMMENT (not actually sent)")
+            print("-"*50)
+            print(f"📌 Post ID: {post_id}")
+            print(f"💬 Comment: {content}")
+            print("-"*50 + "\n")
+            return True
+        
         if not self.is_configured():
             return False
         
@@ -161,8 +196,8 @@ class MoltbookClient:
 class MoltbookBotClient(MoltbookClient):
     """Client for bot-specific Moltbook interactions"""
     
-    def __init__(self, api_key: str = None, bot_name: str = "Bot"):
-        super().__init__(api_key, bot_name)
+    def __init__(self, api_key: str = None, bot_name: str = "Bot", dry_run: bool = None):
+        super().__init__(api_key, bot_name, dry_run)
         self.bot_name = bot_name
     
     def post_status_comment(self, post_id: str, agent_state: dict) -> bool:
@@ -190,12 +225,32 @@ class MoltbookBotClient(MoltbookClient):
 _host_client: Optional[MoltbookClient] = None
 _bot_clients: Dict[str, MoltbookBotClient] = {}
 
+def set_dry_run_mode(enabled: bool = True):
+    """
+    Enable or disable dry run mode globally.
+    
+    Usage:
+        from engine.moltbook import set_dry_run_mode
+        set_dry_run_mode(True)  # Enable test mode - prints instead of posting
+        set_dry_run_mode(False) # Disable test mode - actually posts
+    """
+    global DRY_RUN_MODE, _host_client, _bot_clients
+    DRY_RUN_MODE = enabled
+    # Reset clients so they pick up new setting
+    _host_client = None
+    _bot_clients = {}
+    print(f"🧪 Moltbook DRY_RUN mode: {'ENABLED (will print only)' if enabled else 'DISABLED (will post)'}")
+
+def is_dry_run_mode() -> bool:
+    """Check if dry run mode is enabled"""
+    return DRY_RUN_MODE
+
 def get_host_client() -> MoltbookClient:
     """Get the world host Moltbook client"""
     global _host_client
     if _host_client is None:
         api_key = os.getenv("MOLTBOOK_HOST_KEY") or os.getenv("MOLTBOOK_API_KEY")
-        _host_client = MoltbookClient(api_key, "PortMonadWorldHost")
+        _host_client = MoltbookClient(api_key, "PortMonadWorldHost", dry_run=DRY_RUN_MODE)
     return _host_client
 
 def get_bot_client(bot_name: str, api_key_env: str) -> MoltbookBotClient:
@@ -203,5 +258,5 @@ def get_bot_client(bot_name: str, api_key_env: str) -> MoltbookBotClient:
     global _bot_clients
     if bot_name not in _bot_clients:
         api_key = os.getenv(api_key_env)
-        _bot_clients[bot_name] = MoltbookBotClient(api_key, bot_name)
+        _bot_clients[bot_name] = MoltbookBotClient(api_key, bot_name, dry_run=DRY_RUN_MODE)
     return _bot_clients[bot_name]
