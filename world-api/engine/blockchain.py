@@ -223,6 +223,24 @@ class WorldGateClient:
         except Exception as e:
             return False, str(e)
 
+    def set_credit_exchange_rate(self, private_key: str, new_rate: int) -> Tuple[bool, str]:
+        """Call setCreditExchangeRate() - owner only."""
+        if not self.contract:
+            return False, "No contract configured"
+        try:
+            account = Account.from_key(private_key)
+            nonce = self.w3.eth.get_transaction_count(account.address)
+            tx = self.contract.functions.setCreditExchangeRate(new_rate).build_transaction({
+                'from': account.address,
+                'nonce': nonce,
+                'gas': 100000,
+                'gasPrice': self.w3.eth.gas_price,
+                'chainId': self.w3.eth.chain_id
+            })
+            return self._send_tx(private_key, tx)
+        except Exception as e:
+            return False, str(e)
+
     def withdraw_fees(self, private_key: str) -> Tuple[bool, str]:
         """Call withdrawFees() - owner only. Withdraws entry fees (not reward pool)."""
         if not self.contract:

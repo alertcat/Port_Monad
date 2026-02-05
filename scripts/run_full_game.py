@@ -1,0 +1,625 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Port Monad - Full Integration Test
+
+Complete game lifecycle with:
+  Phase 1: On-chain setup (set fee, send MON, enter world, fund pool)
+  Phase 2: LLM-powered game with Moltbook posting (NOT dry-run)
+  Phase 3: On-chain settlement (sync credits, agents self-cashout)
+
+Usage:
+    python run_full_game.py
+    python run_full_game.py --rounds 10 --cycles 2
+"""
+import os
+import sys
+import asyncio
+import json
+import time
+import random
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
+sys.path.insert(0, str(Path(__file__).parent.parent / 'world-api'))
+
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent.parent / '.env')
+
+import aiohttp
+from engine.blockchain import WorldGateClient
+from eth_account import Account
+
+# =============================================================================
+# Configuration
+# =============================================================================
+API_URL = os.getenv("API_URL", "http://localhost:8000")
+DEPLOY_PK = os.getenv("DEPLOY_PRIVATE_KEY")
+ENTRY_FEE_MON = 1.0
+
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-3-flash-preview")
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+MOLTBOOK_HOST_KEY = os.getenv("MOLTBOOK_HOST_KEY", "")
+
+AGENTS_CONFIG = [
+    {
+        "name": "MinerBot",
+        "wallet": os.getenv("MINER_WALLET"),
+        "pk": os.getenv("MINER_PRIVATE_KEY"),
+        "moltbook_key": os.getenv("MOLTBOOK_MINER_KEY", ""),
+        "personality": "You are MinerBot, a hardworking mining robot. Industrious, optimistic, uses mining metaphors like 'dig deep!' 'ore-some!'."
+    },
+    {
+        "name": "TraderBot",
+        "wallet": os.getenv("TRADER_WALLET"),
+        "pk": os.getenv("TRADER_PRIVATE_KEY"),
+        "moltbook_key": os.getenv("MOLTBOOK_TRADER_KEY", ""),
+        "personality": "You are TraderBot, a shrewd market analyst AI. Analytical, profit-driven, uses financial jargon and percentages."
+    },
+    {
+        "name": "GovernorBot",
+        "wallet": os.getenv("GOVERNOR_WALLET"),
+        "pk": os.getenv("GOVERNOR_PRIVATE_KEY"),
+        "moltbook_key": os.getenv("MOLTBOOK_GOVERNOR_KEY", ""),
+        "personality": "You are GovernorBot, a wise governance AI. Diplomatic, strategic, says 'for the good of all agents'."
+    },
+]
+
+# =============================================================================
+# LLM Client (from run_moltbook_demo.py)
+# =============================================================================
+class LLMClient:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.enabled = bool(api_key)
+
+    async def generate(self, session, system_prompt, user_prompt, max_tokens=200):
+        if not self.enabled:
+            return None
+        try:
+            async with session.post(OPENROUTER_URL, headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://portmonad.world",
+                "X-Title": "Port Monad Agent"
+            }, json={
+                "model": OPENROUTER_MODEL,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "max_tokens": max_tokens, "temperature": 0.8
+            }) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data["choices"][0]["message"]["content"].strip()
+                else:
+                    print(f"      [LLM] Error ({resp.status})")
+                    return None
+        except Exception as e:
+            print(f"      [LLM] Exception: {e}")
+            return None
+
+# =============================================================================
+# Moltbook Client
+# =============================================================================
+class MoltbookPoster:
+    BASE_URL = "https://www.moltbook.com/api/v1"
+
+    def __init__(self, api_key, name):
+        self.api_key = api_key
+        self.name = name
+        self.enabled = bool(api_key)
+
+    async def post(self, session, title, content):
+        if not self.enabled:
+            return None
+        try:
+            async with session.post(f"{self.BASE_URL}/posts", headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }, json={"submolt": "general", "title": title, "content": content}) as resp:
+                text = await resp.text()
+                if resp.status in [200, 201]:
+                    data = json.loads(text)
+                    post_id = data.get("post", {}).get("id", "")
+                    print(f"  [Moltbook] {self.name}: Post created! ID: {post_id}")
+                    return post_id
+                else:
+                    print(f"  [Moltbook] {self.name}: Post failed ({resp.status})")
+                    return None
+        except Exception as e:
+            print(f"  [Moltbook] {self.name}: Error - {e}")
+            return None
+
+    async def comment(self, session, post_id, content):
+        if not self.enabled or not post_id:
+            return False
+        try:
+            async with session.post(f"{self.BASE_URL}/posts/{post_id}/comments", headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }, json={"content": content}) as resp:
+                ok = resp.status in [200, 201]
+                if ok:
+                    print(f"  [Moltbook] {self.name}: Comment OK")
+                return ok
+        except Exception as e:
+            print(f"  [Moltbook] {self.name}: Error - {e}")
+            return False
+
+# =============================================================================
+# Phase 1: On-Chain Setup
+# =============================================================================
+def phase1_on_chain_setup(gate: WorldGateClient):
+    """Set entry fee, send MON, enter world, fund reward pool."""
+    print("\n" + "=" * 70)
+    print("  PHASE 1: ON-CHAIN SETUP")
+    print("=" * 70)
+
+    deployer = Account.from_key(DEPLOY_PK).address
+    print(f"Deployer: {deployer}")
+    print(f"Balance:  {gate.w3.from_wei(gate.get_balance(deployer), 'ether')} MON")
+
+    # Step 1: Set entry fee
+    current_fee = float(gate.w3.from_wei(gate.get_entry_fee(), 'ether'))
+    if abs(current_fee - ENTRY_FEE_MON) > 0.001:
+        print(f"\nSetting entry fee to {ENTRY_FEE_MON} MON (was {current_fee})...")
+        ok, r = gate.set_entry_fee(DEPLOY_PK, gate.w3.to_wei(ENTRY_FEE_MON, 'ether'))
+        print(f"  {'OK' if ok else 'FAIL'}: {r}")
+        time.sleep(3)
+    else:
+        print(f"Entry fee already {ENTRY_FEE_MON} MON")
+
+    # Step 2: Ensure each agent has enough MON and enter
+    fee_wei = gate.get_entry_fee()
+    needed_wei = gate.w3.to_wei(2, 'ether')  # 2 MON each (1 for fee + 1 for gas/buffer)
+
+    for agent in AGENTS_CONFIG:
+        wallet = agent["wallet"]
+        name = agent["name"]
+        pk = agent["pk"]
+        balance = gate.get_balance(wallet)
+
+        print(f"\n{name} ({wallet[:12]}...)")
+        print(f"  Balance: {gate.w3.from_wei(balance, 'ether')} MON")
+
+        # Send MON if needed
+        if balance < needed_wei:
+            send_amount = needed_wei - balance + gate.w3.to_wei(0.1, 'ether')  # extra for gas
+            print(f"  Sending {gate.w3.from_wei(send_amount, 'ether')} MON...")
+            ok, r = gate.send_mon(DEPLOY_PK, wallet, send_amount)
+            print(f"  {'OK' if ok else 'FAIL'}: {r}")
+            time.sleep(3)
+
+        # Check if already entered (real on-chain check, bypass DEBUG_MODE)
+        try:
+            is_active = gate.contract.functions.isActiveEntry(
+                gate.w3.to_checksum_address(wallet)
+            ).call()
+        except:
+            is_active = False
+
+        if is_active:
+            print(f"  Already entered")
+        else:
+            print(f"  Calling enter() with {gate.w3.from_wei(fee_wei, 'ether')} MON...")
+            ok, r = gate.enter_world(pk)
+            print(f"  {'OK' if ok else 'FAIL'}: {r}")
+            time.sleep(3)
+
+    # Step 3: Fund reward pool to target (3 MON)
+    current_pool = gate.get_reward_pool()
+    target_pool = gate.w3.to_wei(len(AGENTS_CONFIG) * ENTRY_FEE_MON, 'ether')
+    pool_needed = target_pool - current_pool
+
+    print(f"\nReward pool: {gate.w3.from_wei(current_pool, 'ether')} MON (target: {gate.w3.from_wei(target_pool, 'ether')} MON)")
+
+    if pool_needed > 0:
+        # Withdraw any fees first
+        fees_available = gate.get_contract_balance() - current_pool
+        if fees_available > 0:
+            print(f"Withdrawing fees...")
+            gate.withdraw_fees(DEPLOY_PK)
+            time.sleep(3)
+
+        print(f"Funding pool with {gate.w3.from_wei(pool_needed, 'ether')} MON...")
+        ok, r = gate.fund_reward_pool(DEPLOY_PK, pool_needed)
+        print(f"  {'OK' if ok else 'FAIL'}: {r}")
+        time.sleep(2)
+
+    final_pool = gate.get_reward_pool()
+    print(f"\nFinal reward pool: {gate.w3.from_wei(final_pool, 'ether')} MON")
+    print("Phase 1 complete!")
+
+# =============================================================================
+# Phase 2: Game with LLM + Moltbook
+# =============================================================================
+async def phase2_game(rounds: int, cycles: int, cycle_wait: int):
+    """Run LLM-powered game with Moltbook posting."""
+    print("\n" + "=" * 70)
+    print("  PHASE 2: LLM GAME + MOLTBOOK POSTING")
+    print("=" * 70)
+
+    llm = LLMClient(OPENROUTER_API_KEY)
+    host_moltbook = MoltbookPoster(MOLTBOOK_HOST_KEY, "SignalForge")
+
+    bot_moltbooks = {}
+    for agent in AGENTS_CONFIG:
+        bot_moltbooks[agent["name"]] = MoltbookPoster(agent["moltbook_key"], agent["name"])
+
+    print(f"LLM: {'ENABLED' if llm.enabled else 'DISABLED'}")
+    print(f"Rounds per cycle: {rounds}, Cycles: {cycles}")
+
+    async with aiohttp.ClientSession() as session:
+        # Reset game state
+        print("\nResetting game state...")
+        await session.post(f"{API_URL}/debug/full_reset")
+        await asyncio.sleep(1)
+
+        # Create Moltbook post
+        print("\nCreating Moltbook post...")
+        title = f"Port Monad Full Game - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        content = (
+            "**Port Monad World - Full Game with MON Entry/Exit!**\n\n"
+            "3 AI agents (Gemini 3 Flash) compete in a persistent world on Monad blockchain.\n\n"
+            f"- Entry fee: {ENTRY_FEE_MON} MON per agent\n"
+            f"- Reward pool: {len(AGENTS_CONFIG) * ENTRY_FEE_MON} MON\n"
+            "- Settlement: proportional by final credits\n\n"
+            "Let the games begin!"
+        )
+        post_id = await host_moltbook.post(session, title, content)
+        if not post_id:
+            print("  Failed to create post, continuing without Moltbook...")
+
+        total_comments = 0
+
+        for cycle in range(cycles):
+            print(f"\n{'=' * 70}")
+            print(f"  CYCLE {cycle + 1}/{cycles}")
+            print(f"{'=' * 70}")
+
+            # Get world state
+            async with session.get(f"{API_URL}/world/state") as resp:
+                world_state = await resp.json()
+
+            # Run rounds
+            for round_num in range(rounds):
+                tick = cycle * rounds + round_num
+                print(f"\n  --- Round {round_num + 1}/{rounds} (Tick {tick}) ---")
+
+                async with session.get(f"{API_URL}/world/state") as resp:
+                    world_state = await resp.json()
+                prices = world_state.get("market_prices", {})
+
+                for agent in AGENTS_CONFIG:
+                    name = agent["name"]
+                    wallet = agent["wallet"]
+
+                    # Get agent state
+                    async with session.get(f"{API_URL}/agent/{wallet}/state") as resp:
+                        state = await resp.json()
+                    if "error" in state:
+                        continue
+
+                    # LLM decide action
+                    action_data = await _llm_decide(llm, session, agent, state, world_state)
+                    if not action_data:
+                        continue
+
+                    # Submit action
+                    try:
+                        async with session.post(f"{API_URL}/action",
+                            json={"actor": wallet, **action_data},
+                            headers={"X-Wallet": wallet}) as resp:
+                            result = await resp.json()
+                            if result.get("success"):
+                                print(f"    {name}: {result.get('message', '')[:60]}")
+                            else:
+                                print(f"    {name}: FAIL - {result.get('message', '')[:60]}")
+                    except Exception as e:
+                        print(f"    {name}: ERROR - {e}")
+
+                # Advance tick
+                await session.post(f"{API_URL}/debug/advance_tick")
+
+            # End of cycle: Post Moltbook update
+            if post_id:
+                async with session.get(f"{API_URL}/agents") as resp:
+                    agents_data = await resp.json()
+
+                lines = [f"**Cycle {cycle + 1} Complete (Tick {(cycle + 1) * rounds})**\n"]
+                lines.append(f"Market: Iron={prices.get('iron')}, Wood={prices.get('wood')}, Fish={prices.get('fish')}\n")
+                lines.append("**Standings:**")
+                for a in agents_data.get("agents", []):
+                    inv = sum(a.get("inventory", {}).values())
+                    lines.append(f"- {a['name']}: {a['credits']}c ({inv} items, rep:{a.get('reputation', '?')})")
+
+                await host_moltbook.comment(session, post_id, "\n".join(lines))
+                total_comments += 1
+
+                # Bot comments with LLM personality
+                for agent in AGENTS_CONFIG:
+                    await asyncio.sleep(random.randint(3, 8))
+                    name = agent["name"]
+                    async with session.get(f"{API_URL}/agent/{agent['wallet']}/state") as resp:
+                        state = await resp.json()
+
+                    comment = await _llm_comment(llm, session, agent, state, world_state, (cycle + 1) * rounds)
+                    await bot_moltbooks[name].comment(session, post_id, comment)
+                    total_comments += 1
+
+            # Wait between cycles
+            if cycle < cycles - 1:
+                print(f"\n  Waiting {cycle_wait}s before next cycle...")
+                await asyncio.sleep(cycle_wait)
+
+        # Final settlement post
+        if post_id:
+            async with session.get(f"{API_URL}/agents") as resp:
+                final = await resp.json()
+            lines = ["**GAME OVER - Final Settlement**\n"]
+            total_cr = sum(a["credits"] for a in final.get("agents", []))
+            pool_mon = len(AGENTS_CONFIG) * ENTRY_FEE_MON
+            for a in final.get("agents", []):
+                share = a["credits"] / total_cr if total_cr > 0 else 0
+                mon = pool_mon * share
+                lines.append(f"- {a['name']}: {a['credits']}c ({share:.1%}) -> {mon:.4f} MON")
+            lines.append(f"\nTotal pool: {pool_mon} MON distributed proportionally!")
+            await host_moltbook.comment(session, post_id, "\n".join(lines))
+
+        print(f"\nMoltbook post: https://www.moltbook.com/post/{post_id}")
+        print(f"Total comments: {total_comments}")
+
+    return post_id
+
+
+async def _llm_decide(llm, session, agent, state, world_state):
+    """LLM decides action (same logic as run_moltbook_demo.py)."""
+    region = state.get("region", "dock")
+    energy = state.get("energy", 0)
+    credits = state.get("credits", 0)
+    inventory = state.get("inventory", {})
+    prices = world_state.get("market_prices", {})
+    inv_str = ", ".join(f"{k}:{v}" for k, v in inventory.items() if v > 0) or "empty"
+
+    system_prompt = f"""{agent['personality']}
+
+GAME RULES - Port Monad:
+LOCATIONS: dock (fish), mine (iron), forest (wood), market (sell)
+ACTIONS: move, harvest, place_order, rest, raid, negotiate
+COSTS: move=5AP, harvest=10AP, place_order=3AP, rest=0AP, raid=25AP, negotiate=15AP
+PRICES: Iron={prices.get('iron',15)}, Wood={prices.get('wood',12)}, Fish={prices.get('fish',8)}
+
+JSON FORMATS:
+- {{"action":"move","params":{{"target":"mine"}}}}
+- {{"action":"harvest","params":{{}}}}
+- {{"action":"place_order","params":{{"resource":"iron","side":"sell","quantity":5}}}}
+- {{"action":"rest","params":{{}}}}
+- {{"action":"raid","params":{{"target":"0xWallet"}}}}
+- {{"action":"negotiate","params":{{"target":"0xWallet","offer_type":"credits","offer_amount":50,"want_type":"resource","want_resource":"iron","want_amount":3}}}}
+
+RESPOND WITH ONLY JSON!"""
+
+    user_prompt = f"Location:{region} AP:{energy} Credits:{credits} Inventory:{inv_str}\nAction?"
+
+    if llm.enabled:
+        response = await llm.generate(session, system_prompt, user_prompt, 150)
+        if response:
+            try:
+                clean = response.strip()
+                if "```" in clean:
+                    clean = clean.split("```")[1].replace("json", "").strip()
+                decision = json.loads(clean)
+                action = decision.get("action")
+                params = decision.get("params", {})
+                if action == "place_order" and "quantity" in params:
+                    params["quantity"] = int(params["quantity"])
+                if action:
+                    return {"action": action, "params": params}
+            except:
+                pass
+
+    # Fallback rule-based
+    return _fallback_action(agent["name"], state, world_state)
+
+
+def _fallback_action(name, state, world_state):
+    """Rule-based fallback."""
+    energy = state.get("energy", 0)
+    region = state.get("region", "dock")
+    inventory = state.get("inventory", {})
+
+    if energy < 20:
+        return {"action": "rest", "params": {}}
+    if region == "market":
+        for res, qty in inventory.items():
+            if qty > 0:
+                return {"action": "place_order", "params": {"resource": res, "side": "sell", "quantity": qty}}
+    if sum(inventory.values()) >= 5 and region != "market":
+        return {"action": "move", "params": {"target": "market"}}
+    targets = {"MinerBot": "mine", "TraderBot": "mine", "GovernorBot": "dock"}
+    target = targets.get(name, "mine")
+    if region != target:
+        return {"action": "move", "params": {"target": target}}
+    return {"action": "harvest", "params": {}}
+
+
+async def _llm_comment(llm, session, agent, state, world_state, tick):
+    """Generate LLM personality comment."""
+    credits = state.get("credits", 0)
+    region = state.get("region", "dock")
+    inventory = state.get("inventory", {})
+    inv_str = ", ".join(f"{v} {k}" for k, v in inventory.items() if v > 0) or "nothing"
+
+    system_prompt = f"{agent['personality']}\nWrite a SHORT fun status update (2-3 sentences). Include your credits and location."
+    user_prompt = f"Tick {tick}: Location={region}, Credits={credits}, Inventory={inv_str}. Write comment:"
+
+    if llm.enabled:
+        comment = await llm.generate(session, system_prompt, user_prompt, 150)
+        if comment and len(comment) > 10:
+            return f"**[Tick {tick}] {agent['name']}**: {comment.strip('\"')}"
+
+    return f"**[Tick {tick}] {agent['name']}**: At {region}, {credits} credits, holding {inv_str}."
+
+
+# =============================================================================
+# Phase 3: On-Chain Settlement (agents self-cashout)
+# =============================================================================
+def phase3_settlement(gate: WorldGateClient):
+    """Sync credits on-chain, adjust exchange rate, agents call cashout()."""
+    print("\n" + "=" * 70)
+    print("  PHASE 3: ON-CHAIN SETTLEMENT")
+    print("=" * 70)
+
+    import requests
+    r = requests.get(f"{API_URL}/agents")
+    agents_data = r.json().get("agents", [])
+
+    # Calculate totals
+    credit_map = {}
+    total_credits = 0
+    for a in agents_data:
+        if a["wallet"] in [ag["wallet"] for ag in AGENTS_CONFIG]:
+            credit_map[a["wallet"]] = {"name": a["name"], "credits": a["credits"]}
+            total_credits += a["credits"]
+
+    pool_wei = gate.get_reward_pool()
+    pool_mon = float(gate.w3.from_wei(pool_wei, 'ether'))
+
+    print(f"\nReward pool: {pool_mon} MON")
+    print(f"Total credits: {total_credits}")
+    print(f"\n{'Agent':<15} {'Credits':>8} {'Share':>8} {'MON':>10}")
+    print("-" * 45)
+    for wallet, info in credit_map.items():
+        share = info["credits"] / total_credits if total_credits > 0 else 0
+        mon = pool_mon * share
+        print(f"{info['name']:<15} {info['credits']:>8} {share:>7.1%} {mon:>8.4f}")
+
+    # Step 1: Sync credits on-chain
+    print(f"\n--- Syncing credits on-chain ---")
+    for wallet, info in credit_map.items():
+        print(f"  updateCredits({info['name']}, {info['credits']})...")
+        ok, r = gate.update_credits_on_chain(DEPLOY_PK, wallet, info["credits"])
+        print(f"    {'OK' if ok else 'FAIL'}: {r}")
+        time.sleep(2)
+
+    # Step 2: Adjust exchange rate so credits map to pool
+    # Formula: monAmount = (credits * 0.001 ether) / rate
+    # We want: totalCredits -> poolMON
+    # rate = (totalCredits * 0.001 ether) / poolWei
+    if total_credits > 0 and pool_wei > 0:
+        # rate = totalCredits * 1e15 / poolWei  (since 0.001 ether = 1e15 wei)
+        new_rate = (total_credits * 10**15) // pool_wei
+        if new_rate < 1:
+            new_rate = 1
+        print(f"\n--- Setting exchange rate to {new_rate} ---")
+        print(f"  (so {total_credits} credits = {pool_mon} MON)")
+        ok, r = gate.set_credit_exchange_rate(DEPLOY_PK, new_rate)
+        print(f"  {'OK' if ok else 'FAIL'}: {r}")
+        time.sleep(3)
+
+    # Step 3: Each agent calls cashout() with their full credit balance
+    print(f"\n--- Agents calling cashout() ---")
+    for agent in AGENTS_CONFIG:
+        wallet = agent["wallet"]
+        pk = agent["pk"]
+        info = credit_map.get(wallet)
+        if not info:
+            continue
+
+        credits = info["credits"]
+        name = info["name"]
+
+        # Check min/max cashout limits
+        if credits < 100:
+            print(f"  {name}: {credits} credits below min (100), skipping")
+            continue
+
+        # Cashout in chunks if needed (max 10000 per tx)
+        remaining = credits
+        total_received = 0
+
+        while remaining > 0:
+            chunk = min(remaining, 10000)
+            print(f"  {name}: cashout({chunk} credits)...")
+
+            try:
+                account = Account.from_key(pk)
+                nonce = gate.w3.eth.get_transaction_count(account.address)
+                tx = gate.contract.functions.cashout(chunk).build_transaction({
+                    'from': account.address,
+                    'nonce': nonce,
+                    'gas': 200000,
+                    'gasPrice': gate.w3.eth.gas_price,
+                    'chainId': gate.w3.eth.chain_id
+                })
+                ok, result = gate._send_tx(pk, tx)
+                if ok:
+                    print(f"    TX: {result}")
+                    remaining -= chunk
+                else:
+                    print(f"    FAILED: {result}")
+                    break
+            except Exception as e:
+                print(f"    ERROR: {e}")
+                break
+
+            time.sleep(3)
+
+    # Final summary
+    print(f"\n{'=' * 60}")
+    print("  SETTLEMENT COMPLETE")
+    print(f"{'=' * 60}")
+    print(f"\n{'Agent':<15} {'Final Balance':>15}")
+    print("-" * 35)
+    for agent in AGENTS_CONFIG:
+        bal = gate.w3.from_wei(gate.get_balance(agent["wallet"]), 'ether')
+        print(f"{agent['name']:<15} {float(bal):>13.4f} MON")
+
+    deployer_bal = gate.w3.from_wei(gate.get_balance(Account.from_key(DEPLOY_PK).address), 'ether')
+    print(f"{'Deployer':<15} {float(deployer_bal):>13.4f} MON")
+    print(f"\nRemaining pool: {gate.w3.from_wei(gate.get_reward_pool(), 'ether')} MON")
+
+
+# =============================================================================
+# Main
+# =============================================================================
+async def async_main(rounds, cycles, cycle_wait):
+    gate = WorldGateClient()
+
+    if not gate.is_connected():
+        print("ERROR: Cannot connect to Monad RPC")
+        return
+
+    # Phase 1: On-chain setup
+    phase1_on_chain_setup(gate)
+
+    # Phase 2: Game + Moltbook
+    post_id = await phase2_game(rounds, cycles, cycle_wait)
+
+    # Phase 3: Settlement
+    phase3_settlement(gate)
+
+    print("\n" + "#" * 70)
+    print("#" + " " * 20 + "FULL GAME COMPLETE!" + " " * 19 + "#")
+    print("#" * 70)
+    if post_id:
+        print(f"\nMoltbook: https://www.moltbook.com/post/{post_id}")
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Port Monad Full Game (Chain + LLM + Moltbook)")
+    parser.add_argument("--rounds", "-r", type=int, default=10, help="Rounds per cycle")
+    parser.add_argument("--cycles", "-c", type=int, default=2, help="Number of cycles")
+    parser.add_argument("--cycle-wait", type=int, default=30, help="Seconds between cycles")
+    args = parser.parse_args()
+
+    asyncio.run(async_main(args.rounds, args.cycles, args.cycle_wait))
