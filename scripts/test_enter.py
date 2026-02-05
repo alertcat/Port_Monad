@@ -116,30 +116,35 @@ def main():
     print(f"Fees available:   {gate.w3.from_wei(fees_available, 'ether')} MON")
 
     entered_count = sum(1 for _, ok, _ in results if ok)
-    pool_amount = entered_count * fee  # fund pool with exactly the entry fees collected
+    # Always fund pool to match total agents * entry fee, regardless of who was already in
+    target_pool = len(AGENTS) * fee  # 3 agents * 1 MON = 3 MON
+    current_pool = gate.get_reward_pool()
+    pool_needed = target_pool - current_pool  # How much more to add
 
-    if pool_amount > 0 and fees_available > 0:
-        # First withdraw fees to deploy wallet
-        print(f"\nWithdrawing {gate.w3.from_wei(fees_available, 'ether')} MON fees to deploy wallet...")
-        ok, result = gate.withdraw_fees(DEPLOY_PK)
-        if ok:
-            print(f"  TX: {result}")
-            time.sleep(3)
-        else:
-            print(f"  Withdraw failed (may already be empty): {result}")
+    if pool_needed > 0:
+        # Withdraw any fees sitting in contract first
+        if fees_available > 0:
+            print(f"\nWithdrawing {gate.w3.from_wei(fees_available, 'ether')} MON fees to deploy wallet...")
+            ok, result = gate.withdraw_fees(DEPLOY_PK)
+            if ok:
+                print(f"  TX: {result}")
+                time.sleep(3)
+            else:
+                print(f"  Withdraw skipped: {result}")
 
-        # Then fund reward pool with the same amount
-        print(f"Funding reward pool with {gate.w3.from_wei(pool_amount, 'ether')} MON...")
-        ok, result = gate.fund_reward_pool(DEPLOY_PK, pool_amount)
+        # Fund reward pool to reach target (3 MON for 3 agents)
+        print(f"Funding reward pool with {gate.w3.from_wei(pool_needed, 'ether')} MON (target: {gate.w3.from_wei(target_pool, 'ether')} MON)...")
+        ok, result = gate.fund_reward_pool(DEPLOY_PK, pool_needed)
         if ok:
             print(f"  TX: {result}")
             time.sleep(2)
             new_pool = gate.get_reward_pool()
-            print(f"  New reward pool: {gate.w3.from_wei(new_pool, 'ether')} MON")
+            print(f"  Reward pool now: {gate.w3.from_wei(new_pool, 'ether')} MON")
         else:
             print(f"  FAILED: {result}")
     else:
-        print("No new fees to move to reward pool")
+        current_mon = gate.w3.from_wei(current_pool, 'ether')
+        print(f"Reward pool already at {current_mon} MON (target: {gate.w3.from_wei(target_pool, 'ether')} MON)")
 
     # --- Summary ---
     print(f"\n{'='*60}")
