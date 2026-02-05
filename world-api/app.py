@@ -195,4 +195,28 @@ app.openapi = custom_openapi
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import socket
+    import sys
+    
+    port = 8000
+    
+    # Check if port is already in use
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    result = sock.connect_ex(('127.0.0.1', port))
+    sock.close()
+    
+    if result == 0:
+        print(f"\n❌ ERROR: Port {port} is already in use!")
+        print(f"   Kill the old process first:")
+        print(f"   Windows:  netstat -ano | findstr :{port}")
+        print(f"             taskkill /F /PID <PID>")
+        print(f"   Linux:    kill $(lsof -t -i:{port})")
+        sys.exit(1)
+    
+    print(f"\n🚀 Starting Port Monad World API on port {port}")
+    print(f"   DEBUG_MODE: {os.getenv('DEBUG_MODE', 'false')}")
+    print(f"   MOLTBOOK_DRY_RUN: {os.getenv('MOLTBOOK_DRY_RUN', 'false')}")
+    print(f"   Dashboard: http://localhost:{port}/dashboard")
+    print(f"   API Docs:  http://localhost:{port}/docs\n")
+    
+    uvicorn.run(app, host="0.0.0.0", port=port)
