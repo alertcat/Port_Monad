@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
+import { Badge } from "./ui/badge"
 import { Anchor, Trophy, TrendingUp, Zap, ScrollText, BookOpen, Pickaxe, TreePine, Fish } from "lucide-react"
 
 interface Agent {
