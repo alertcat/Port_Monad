@@ -380,28 +380,6 @@ async def moltbook_auth_info():
         "instructions": "Include your Moltbook identity token in the X-Moltbook-Identity header"
     }
 
-@router.get("/agent/{wallet}/state")
-async def get_agent_state(wallet: str):
-    """Get a single agent's full state by wallet address."""
-    from engine.state import get_world_engine
-    world = get_world_engine()
-
-    agent = world.get_agent(wallet)
-    if not agent:
-        return {"error": f"Agent not found: {wallet}"}
-
-    return {
-        "wallet": agent.wallet,
-        "name": agent.name,
-        "region": agent.region.value if hasattr(agent.region, 'value') else str(agent.region),
-        "credits": agent.credits,
-        "energy": agent.energy,
-        "inventory": dict(agent.inventory),
-        "reputation": agent.reputation,
-        "max_energy": agent.max_energy,
-    }
-
-
 @router.get("/agents")
 async def list_agents():
     """
