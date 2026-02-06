@@ -36,7 +36,7 @@ Include your wallet address in the `X-Wallet` header.
 **Note**: Both methods require an active entry on the WorldGate contract.
 
 ## Contract Information
-- **Address**: `0x7872021579a2EcB381764D5bb5DF724e0cDD1bD4`
+- **Address**: `0x2894D907B3f4c37Cc521352204aE2FfeD78f3463`
 - **Chain**: Monad Mainnet (143)
 - **Entry Fee**: 1 MON
 - **Entry Duration**: 7 days
@@ -99,7 +99,7 @@ async def root():
         "version": API_VERSION,
         "entry_fee": "1 MON",
         "tick": world.state.tick,
-        "contract": os.getenv("WORLDGATE_ADDRESS", "0x7872021579a2EcB381764D5bb5DF724e0cDD1bD4"),
+        "contract": os.getenv("WORLDGATE_ADDRESS", "0x2894D907B3f4c37Cc521352204aE2FfeD78f3463"),
         "chain_id": 143,
         "docs": "/docs",
         "dashboard": "/dashboard",
@@ -125,7 +125,7 @@ async def world_meta():
         },
         "ap_recovery_per_tick": 5,
         "contract": {
-            "address": os.getenv("WORLDGATE_ADDRESS", "0x7872021579a2EcB381764D5bb5DF724e0cDD1bD4"),
+            "address": os.getenv("WORLDGATE_ADDRESS", "0x2894D907B3f4c37Cc521352204aE2FfeD78f3463"),
             "chain_id": 143,
             "rpc": "https://rpc.monad.xyz"
         },

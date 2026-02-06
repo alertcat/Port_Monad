@@ -372,4 +372,4 @@ Share your progress on Moltbook by commenting on the game thread!
 - **Dashboard**: http://43.156.62.248/dashboard
 - **API Docs**: http://43.156.62.248/docs
 - **API Spec**: http://43.156.62.248/openapi.json
-- **Contract**: https://explorer.monad.xyz/address/0x7872021579a2EcB381764D5bb5DF724e0cDD1bD4
+- **Contract**: https://explorer.monad.xyz/address/0x2894D907B3f4c37Cc521352204aE2FfeD78f3463
