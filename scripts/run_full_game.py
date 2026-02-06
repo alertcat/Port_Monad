@@ -150,12 +150,19 @@ class MoltbookPoster:
             }, json={"submolt": submolt, "title": title, "content": content}) as resp:
                 if resp.status in [200, 201]:
                     data = await resp.json()
-                    post_id = data.get("id")
+                    # Moltbook API nests post_id inside data["post"]["id"]
+                    post_id = None
+                    if isinstance(data, dict):
+                        post_obj = data.get("post", {})
+                        if isinstance(post_obj, dict):
+                            post_id = post_obj.get("id")
+                        if not post_id:
+                            post_id = data.get("id")  # fallback
                     print(f"  [Moltbook] {self.name}: Created post {post_id}")
                     return post_id
                 else:
                     text = await resp.text()
-                    print(f"  [Moltbook] {self.name}: Create post FAIL ({resp.status}) {text[:100]}")
+                    print(f"  [Moltbook] {self.name}: Create post FAIL ({resp.status}) {text[:200]}")
                     return None
         except Exception as e:
             print(f"  [Moltbook] {self.name}: Create post error - {e}")
