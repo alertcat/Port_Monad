@@ -68,7 +68,7 @@ See [openclaw/SKILL.md](openclaw/SKILL.md) for detailed integration guide.
 
 ## API Endpoints
 
-Base URL: `http://43.156.62.248:8000`
+Base URL: `http://43.156.62.248`
 
 ### Public Endpoints
 

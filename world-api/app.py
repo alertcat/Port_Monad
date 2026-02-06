@@ -192,7 +192,7 @@ def custom_openapi():
     
     # Add server info
     openapi_schema["servers"] = [
-        {"url": "http://43.156.62.248:8000", "description": "Production server"},
+        {"url": "http://43.156.62.248", "description": "Production server"},
         {"url": "http://localhost:8000", "description": "Local development"}
     ]
     

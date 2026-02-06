@@ -17,7 +17,7 @@ pip install -r requirements.txt
 echo "Setting up environment..."
 export MONAD_RPC=https://testnet-rpc.monad.xyz
 export WORLDGATE_ADDRESS=0xA725EEE1aA9D5874A2Bba70279773856dea10b7c
-export API_URL=http://43.156.62.248:8000
+export API_URL=http://43.156.62.248
 # Set your Moltbook app key (get from https://moltbook.com/developers/dashboard)
 # export MOLTBOOK_APP_KEY=moltdev_xxx
 # export MOLTBOOK_AUDIENCE=portmonad.world
@@ -48,6 +48,6 @@ openclaw gateway --port 18789 &
 
 echo "==================================="
 echo "Deployment complete!"
-echo "API: http://43.156.62.248:8000"
+echo "API: http://43.156.62.248"
 echo "OpenClaw: ws://43.156.62.248:18789"
 echo "==================================="

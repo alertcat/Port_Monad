@@ -373,7 +373,7 @@ async def moltbook_auth_info():
     """Get Moltbook authentication instructions"""
     import os
     return {
-        "auth_url": "https://moltbook.com/auth.md?app=PortMonad&endpoint=http://43.156.62.248:8000/action",
+        "auth_url": "https://moltbook.com/auth.md?app=PortMonad&endpoint=http://43.156.62.248/action",
         "header": "X-Moltbook-Identity",
         "enabled": bool(os.getenv("MOLTBOOK_APP_KEY")),
         "audience": os.getenv("MOLTBOOK_AUDIENCE", "portmonad.world"),
