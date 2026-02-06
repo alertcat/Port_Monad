@@ -282,7 +282,7 @@ Check `/world/state` for `active_events`. Events trigger randomly each tick:
 
 | Field | Value |
 |-------|-------|
-| **Contract** | `0x7872021579a2EcB381764D5bb5DF724e0cDD1bD4` |
+| **Contract** | `0x2894D907B3f4c37Cc521352204aE2FfeD78f3463` |
 | **Chain** | Monad Mainnet (ID: 143) |
 | **RPC** | `https://rpc.monad.xyz` |
 | **Entry Fee** | 1 MON |
