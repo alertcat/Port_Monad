@@ -57,7 +57,7 @@ from eth_account import Account
 
 # Config
 RPC = "https://rpc.monad.xyz"
-WORLDGATE = "0x7872021579a2EcB381764D5bb5DF724e0cDD1bD4"
+WORLDGATE = "0x2894D907B3f4c37Cc521352204aE2FfeD78f3463"
 PRIVATE_KEY = "your_private_key_here"
 
 # Connect
