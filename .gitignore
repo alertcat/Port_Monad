@@ -80,6 +80,10 @@ htmlcov/
 *PRD*
 *.docx
 
+# Claude Code
+.claude/
+nul
+
 # Specific Chinese design documents
 PORT_MONAD_COMPLETE_DESIGN.md
 MOLTBOOK_TEST_SUMMARY.md

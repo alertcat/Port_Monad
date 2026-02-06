@@ -76,6 +76,14 @@ async def dashboard():
         return FileResponse(str(dashboard_file))
     return {"error": "Dashboard not found"}
 
+@app.get("/game", include_in_schema=False)
+async def game_view():
+    """Serve the Smallville-style game world view"""
+    game_file = static_dir / "game.html"
+    if game_file.exists():
+        return FileResponse(str(game_file))
+    return {"error": "Game view not found"}
+
 @app.get("/health")
 async def health():
     """Health check endpoint"""
