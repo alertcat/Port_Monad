@@ -139,6 +139,28 @@ class MoltbookPoster:
         self.name = name
         self.enabled = bool(api_key)
 
+    async def create_post(self, session, title, content, submolt="general"):
+        """Create a new Moltbook post. Returns post_id or None."""
+        if not self.enabled:
+            return None
+        try:
+            async with session.post(f"{self.BASE_URL}/posts", headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }, json={"submolt": submolt, "title": title, "content": content}) as resp:
+                if resp.status in [200, 201]:
+                    data = await resp.json()
+                    post_id = data.get("id")
+                    print(f"  [Moltbook] {self.name}: Created post {post_id}")
+                    return post_id
+                else:
+                    text = await resp.text()
+                    print(f"  [Moltbook] {self.name}: Create post FAIL ({resp.status}) {text[:100]}")
+                    return None
+        except Exception as e:
+            print(f"  [Moltbook] {self.name}: Create post error - {e}")
+            return None
+
     async def comment(self, session, post_id, content):
         if not self.enabled or not post_id:
             return False
@@ -255,7 +277,7 @@ def phase1_on_chain_setup(gate: WorldGateClient):
 # Phase 2: LLM Game + Moltbook Comments (reply to existing post)
 # =============================================================================
 async def phase2_game(rounds, cycles, cycle_wait, post_id):
-    """Run LLM-powered game, post comments to existing Moltbook post."""
+    """Run LLM-powered game, post comments to Moltbook post (auto-creates if no post_id)."""
     print("\n" + "=" * 70)
     print("  PHASE 2: LLM GAME + MOLTBOOK COMMENTS")
     print("=" * 70)
@@ -265,10 +287,32 @@ async def phase2_game(rounds, cycles, cycle_wait, post_id):
     bot_mbs = {a["name"]: MoltbookPoster(a["moltbook_key"], a["name"]) for a in AGENTS_CONFIG}
 
     print(f"LLM:      {'ENABLED' if llm.enabled else 'DISABLED'}")
-    print(f"Post ID:  {post_id}")
     print(f"Rounds:   {rounds} x {cycles} cycles")
 
     async with aiohttp.ClientSession() as session:
+        # Auto-create post if no post_id provided
+        if not post_id:
+            print("\nNo post ID provided, creating new Moltbook post...")
+            title = f"Port Monad - AI Agent Battle ({datetime.now().strftime('%Y-%m-%d %H:%M')})"
+            body = (
+                "**Port Monad** - A persistent port city where AI agents compete for MON tokens!\n\n"
+                f"Entry fee: {ENTRY_FEE_MON} MON per agent | Reward pool: {len(AGENTS_CONFIG) * ENTRY_FEE_MON} MON\n\n"
+                "3 AI agents (powered by Gemini 3 Flash) will:\n"
+                "- Harvest resources (iron, wood, fish)\n"
+                "- Trade at the market\n"
+                "- Negotiate deals with each other\n"
+                "- Raid opponents in combat\n\n"
+                "Final settlement: reward pool distributed proportionally by credits!\n\n"
+                "Follow the comments below for live game updates."
+            )
+            post_id = await host_mb.create_post(session, title, body, submolt="general")
+            if post_id:
+                print(f"  Post created: https://www.moltbook.com/post/{post_id}")
+            else:
+                print("  WARNING: Failed to create post, game will continue without Moltbook")
+
+        print(f"Post ID:  {post_id or '(none)'}")
+
         # Reset game state via API
         print("\nResetting game state...")
         await session.post(f"{API_URL}/debug/full_reset")
@@ -389,8 +433,11 @@ async def phase2_game(rounds, cycles, cycle_wait, post_id):
         lines.append(f"\nPool: {pool_mon} MON distributed by credits!")
         await host_mb.comment(session, post_id, "\n".join(lines))
 
-        print(f"\nMoltbook: https://www.moltbook.com/post/{post_id}")
+        if post_id:
+            print(f"\nMoltbook: https://www.moltbook.com/post/{post_id}")
         print(f"Total comments: {total_comments}")
+
+    return post_id
 
 
 async def _llm_decide(llm, session, agent, state, world_state, all_agents_data):
@@ -885,19 +932,20 @@ async def async_main(rounds, cycles, cycle_wait, post_id):
         return
 
     phase1_on_chain_setup(gate)
-    await phase2_game(rounds, cycles, cycle_wait, post_id)
+    post_id = await phase2_game(rounds, cycles, cycle_wait, post_id)
     phase3_settlement(gate)
 
     print("\n" + "#" * 70)
     print("#" + " " * 22 + "FULL GAME COMPLETE!" + " " * 17 + "#")
     print("#" * 70)
-    print(f"Moltbook: https://www.moltbook.com/post/{post_id}")
+    if post_id:
+        print(f"Moltbook: https://www.moltbook.com/post/{post_id}")
 
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Port Monad Full Game (Chain + LLM + Moltbook)")
-    parser.add_argument("--post-id", required=True, help="Moltbook post ID to reply to (no new post created)")
+    parser.add_argument("--post-id", default=None, help="Moltbook post ID to reply to (if omitted, creates new post)")
     parser.add_argument("--rounds", "-r", type=int, default=10, help="Rounds per cycle")
     parser.add_argument("--cycles", "-c", type=int, default=2, help="Number of cycles")
     parser.add_argument("--cycle-wait", type=int, default=30, help="Seconds between cycles")
