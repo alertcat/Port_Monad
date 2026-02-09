@@ -113,11 +113,12 @@ class RulesEngine:
     
     def _handle_rest(self, agent: Agent, params: dict) -> dict:
         """Handle rest action"""
-        if agent.region != Region.TAVERN:
-            # Can rest anywhere, but tavern is more efficient
-            recovery = 20
-        else:
+        if agent.region == Region.DOCK:
+            # Dock has a tavern — more efficient rest
             recovery = 30
+        else:
+            # Can rest anywhere, but dock is more efficient
+            recovery = 20
         
         old_energy = agent.energy
         agent.energy = min(agent.max_energy, agent.energy + recovery)
