@@ -84,6 +84,32 @@ async def game_view():
         return FileResponse(str(game_file))
     return {"error": "Game view not found"}
 
+@app.get("/game3d", include_in_schema=False)
+async def game3d_view():
+    """Serve the Three.js 3D world view"""
+    game_file = static_dir / "game3d.html"
+    if game_file.exists():
+        return FileResponse(str(game_file))
+    return {"error": "3D game view not found"}
+
+@app.get("/pyth/price")
+async def pyth_price():
+    """Get real-time MON/USD price from Pyth oracle (affects market prices)"""
+    from engine.pyth_oracle import get_pyth_feed
+    feed = get_pyth_feed()
+    price = feed.get_mon_usd_price()
+    baseline = feed.baseline_price
+    change_pct = 0.0
+    if baseline and price:
+        change_pct = ((price - baseline) / baseline) * 100
+    return {
+        "mon_usd": price,
+        "baseline": baseline,
+        "change_pct": round(change_pct, 4),
+        "source": "Pyth Network (MON/USD)",
+        "cache_ttl_s": 30
+    }
+
 @app.get("/health")
 async def health():
     """Health check endpoint"""
