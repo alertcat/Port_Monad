@@ -110,6 +110,127 @@ async def pyth_price():
         "cache_ttl_s": 30
     }
 
+@app.get("/demo", include_in_schema=False)
+async def demo_page():
+    """Serve the demo control panel for judges"""
+    demo_file = static_dir / "demo.html"
+    if demo_file.exists():
+        return FileResponse(str(demo_file))
+    return {"error": "Demo page not found"}
+
+# ---------------------------------------------------------------------------
+# Demo runner: judges can trigger full game from browser
+# ---------------------------------------------------------------------------
+import subprocess
+import threading
+import time as _time
+
+_demo_state = {
+    "running": False,
+    "log": "",
+    "started_at": None,
+    "finished_at": None,
+    "exit_code": None,
+    "pid": None,
+}
+_demo_lock = threading.Lock()
+
+def _run_demo_background(rounds, cycles, cycle_wait):
+    """Run run_full_game.py in background, capture output."""
+    global _demo_state
+    script = str(Path(__file__).parent.parent / "scripts" / "run_full_game.py")
+    cmd = [
+        "python", script,
+        "--rounds", str(rounds),
+        "--cycles", str(cycles),
+        "--cycle-wait", str(cycle_wait),
+    ]
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            cwd=str(Path(__file__).parent.parent),
+        )
+        with _demo_lock:
+            _demo_state["pid"] = proc.pid
+        for line in proc.stdout:
+            with _demo_lock:
+                _demo_state["log"] += line
+        proc.wait()
+        with _demo_lock:
+            _demo_state["exit_code"] = proc.returncode
+            _demo_state["finished_at"] = _time.time()
+            _demo_state["running"] = False
+    except Exception as e:
+        with _demo_lock:
+            _demo_state["log"] += f"\n\nERROR: {e}\n"
+            _demo_state["running"] = False
+            _demo_state["exit_code"] = -1
+            _demo_state["finished_at"] = _time.time()
+
+@app.post("/demo/start")
+async def demo_start(rounds: int = 5, cycles: int = 1, cycle_wait: int = 30):
+    """Start a full game demo (judges can trigger remotely)"""
+    with _demo_lock:
+        if _demo_state["running"]:
+            return {"error": "Demo already running", "started_at": _demo_state["started_at"]}
+        _demo_state["running"] = True
+        _demo_state["log"] = ""
+        _demo_state["started_at"] = _time.time()
+        _demo_state["finished_at"] = None
+        _demo_state["exit_code"] = None
+        _demo_state["pid"] = None
+
+    t = threading.Thread(target=_run_demo_background, args=(rounds, cycles, cycle_wait), daemon=True)
+    t.start()
+    return {"status": "started", "rounds": rounds, "cycles": cycles, "cycle_wait": cycle_wait}
+
+@app.get("/demo/status")
+async def demo_status():
+    """Get demo run status and log"""
+    with _demo_lock:
+        elapsed = None
+        if _demo_state["started_at"]:
+            end = _demo_state["finished_at"] or _time.time()
+            elapsed = round(end - _demo_state["started_at"], 1)
+        return {
+            "running": _demo_state["running"],
+            "exit_code": _demo_state["exit_code"],
+            "elapsed_s": elapsed,
+            "log_lines": _demo_state["log"].count("\n"),
+        }
+
+@app.get("/demo/log")
+async def demo_log(offset: int = 0):
+    """Get demo log output (use offset to get incremental updates)"""
+    with _demo_lock:
+        log = _demo_state["log"]
+        return {
+            "running": _demo_state["running"],
+            "exit_code": _demo_state["exit_code"],
+            "total_length": len(log),
+            "offset": offset,
+            "content": log[offset:],
+        }
+
+@app.post("/demo/stop")
+async def demo_stop():
+    """Stop a running demo"""
+    with _demo_lock:
+        if not _demo_state["running"] or not _demo_state["pid"]:
+            return {"error": "No demo running"}
+        pid = _demo_state["pid"]
+    try:
+        import signal
+        os.kill(pid, signal.SIGTERM)
+        return {"status": "stopped", "pid": pid}
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.get("/health")
 async def health():
     """Health check endpoint"""
