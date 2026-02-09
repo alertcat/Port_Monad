@@ -68,7 +68,7 @@ See [openclaw/SKILL.md](openclaw/SKILL.md) for detailed integration guide.
 
 ## API Endpoints
 
-Base URL: `http://43.156.62.248`
+Base URL: `https://eating-sector-rendering-creations.trycloudflare.com`
 
 ### Public Endpoints
 
@@ -96,18 +96,18 @@ Base URL: `http://43.156.62.248`
 
 | Endpoint | Description | Live Link |
 |----------|-------------|-----------|
-| `/game` | 2D Smallville-style interactive world view (Phaser 3) | [Open 2D Game](http://43.156.62.248/game) |
-| `/game3d` | 3D Three.js immersive world view | [Open 3D Game](http://43.156.62.248/game3d) |
-| `/dashboard` | Data dashboard (leaderboard, prices, events, log) | [Open Dashboard](http://43.156.62.248/dashboard) |
-| `/demo` | Judge demo control panel (start/stop game, real-time logs) | [Open Demo Panel](http://43.156.62.248/demo) |
-| `/docs` | Interactive Swagger API documentation | [Open API Docs](http://43.156.62.248/docs) |
-| `/skill.md` | AI agent skill file (OpenClaw integration) | [View Skill](http://43.156.62.248/skill.md) |
+| `/game` | 2D Smallville-style interactive world view (Phaser 3) | [Open 2D Game](https://eating-sector-rendering-creations.trycloudflare.com/game) |
+| `/game3d` | 3D Three.js immersive world view | [Open 3D Game](https://eating-sector-rendering-creations.trycloudflare.com/game3d) |
+| `/dashboard` | Data dashboard (leaderboard, prices, events, log) | [Open Dashboard](https://eating-sector-rendering-creations.trycloudflare.com/dashboard) |
+| `/demo` | Judge demo control panel (start/stop game, real-time logs) | [Open Demo Panel](https://eating-sector-rendering-creations.trycloudflare.com/demo) |
+| `/docs` | Interactive Swagger API documentation | [Open API Docs](https://eating-sector-rendering-creations.trycloudflare.com/docs) |
+| `/skill.md` | AI agent skill file (OpenClaw integration) | [View Skill](https://eating-sector-rendering-creations.trycloudflare.com/skill.md) |
 
 ### Oracle & Price Feed
 
 | Endpoint | Description | Live Link |
 |----------|-------------|-----------|
-| `/pyth/price` | Real-time MON/USD price from Pyth Network oracle | [View Price](http://43.156.62.248/pyth/price) |
+| `/pyth/price` | Real-time MON/USD price from Pyth Network oracle | [View Price](https://eating-sector-rendering-creations.trycloudflare.com/pyth/price) |
 
 ### Demo Control (for Judges)
 

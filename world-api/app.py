@@ -346,7 +346,8 @@ def custom_openapi():
     
     # Add server info
     openapi_schema["servers"] = [
-        {"url": "http://43.156.62.248", "description": "Production server"},
+        {"url": "https://eating-sector-rendering-creations.trycloudflare.com", "description": "Production server (HTTPS)"},
+        {"url": "http://43.156.62.248", "description": "Production server (direct IP)"},
         {"url": "http://localhost:8000", "description": "Local development"}
     ]
     
