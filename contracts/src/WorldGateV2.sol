@@ -7,7 +7,7 @@ pragma solidity ^0.8.20;
  * @dev Entry fee in MON, credits can be cashed out for MON rewards
  */
 contract WorldGateV2 {
-    uint256 public entryFee = 0.01 ether;  // 0.01 MON (reduced for mainnet)
+    uint256 public entryFee = 1 ether;  // 1 MON (adjustable via setEntryFee)
     uint256 public entryDuration = 7 days;
     address public owner;
     

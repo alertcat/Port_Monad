@@ -11,7 +11,7 @@ Phase 4: Exit / Settlement
 
 Usage:
     python settle_and_exit.py
-    python settle_and_exit.py --api http://43.156.62.248:8000
+    python settle_and_exit.py --api http://43.156.62.248
 """
 import os
 import sys

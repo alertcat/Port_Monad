@@ -38,7 +38,7 @@ CONFIG = {
     "RPC_URL": "https://testnet-rpc.monad.xyz",
     "CHAIN_ID": 10143,
     "WORLDGATE_ADDRESS": "0xA725EEE1aA9D5874A2Bba70279773856dea10b7c",
-    "API_URL": os.getenv("API_URL", "http://43.156.62.248:8000"),
+    "API_URL": os.getenv("API_URL", "http://43.156.62.248"),
     "ENTRY_FEE": 0.05  # MON
 }
 

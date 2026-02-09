@@ -36,7 +36,7 @@ Include your wallet address in the `X-Wallet` header.
 **Note**: Both methods require an active entry on the WorldGate contract.
 
 ## Contract Information
-- **Address**: `0x7872021579a2EcB381764D5bb5DF724e0cDD1bD4`
+- **Address**: `0x2894D907B3f4c37Cc521352204aE2FfeD78f3463`
 - **Chain**: Monad Mainnet (143)
 - **Entry Fee**: 1 MON
 - **Entry Duration**: 7 days
@@ -78,37 +78,11 @@ async def dashboard():
 
 @app.get("/game", include_in_schema=False)
 async def game_view():
-    """Serve the Phaser 3 2D game world view"""
+    """Serve the Smallville-style game world view"""
     game_file = static_dir / "game.html"
     if game_file.exists():
         return FileResponse(str(game_file))
     return {"error": "Game view not found"}
-
-@app.get("/game3d", include_in_schema=False)
-async def game3d_view():
-    """Serve the Three.js 3D world view"""
-    game_file = static_dir / "game3d.html"
-    if game_file.exists():
-        return FileResponse(str(game_file))
-    return {"error": "3D game view not found"}
-
-@app.get("/pyth/price")
-async def pyth_price():
-    """Get real-time MON/USD price from Pyth oracle (affects market prices)"""
-    from engine.pyth_oracle import get_pyth_feed
-    feed = get_pyth_feed()
-    price = feed.get_mon_usd_price()
-    baseline = feed.baseline_price
-    change_pct = 0.0
-    if baseline and price:
-        change_pct = ((price - baseline) / baseline) * 100
-    return {
-        "mon_usd": price,
-        "baseline": baseline,
-        "change_pct": round(change_pct, 4),
-        "source": "Pyth Network (MON/USD)",
-        "cache_ttl_s": 30
-    }
 
 @app.get("/health")
 async def health():
@@ -125,7 +99,7 @@ async def root():
         "version": API_VERSION,
         "entry_fee": "1 MON",
         "tick": world.state.tick,
-        "contract": os.getenv("WORLDGATE_ADDRESS", "0x7872021579a2EcB381764D5bb5DF724e0cDD1bD4"),
+        "contract": os.getenv("WORLDGATE_ADDRESS", "0x2894D907B3f4c37Cc521352204aE2FfeD78f3463"),
         "chain_id": 143,
         "docs": "/docs",
         "dashboard": "/dashboard",
@@ -154,7 +128,7 @@ async def world_meta():
         },
         "ap_recovery_per_tick": 5,
         "contract": {
-            "address": os.getenv("WORLDGATE_ADDRESS", "0x7872021579a2EcB381764D5bb5DF724e0cDD1bD4"),
+            "address": os.getenv("WORLDGATE_ADDRESS", "0x2894D907B3f4c37Cc521352204aE2FfeD78f3463"),
             "chain_id": 143,
             "rpc": "https://rpc.monad.xyz"
         },
@@ -224,7 +198,7 @@ def custom_openapi():
     
     # Add server info
     openapi_schema["servers"] = [
-        {"url": "http://43.156.62.248:8000", "description": "Production server"},
+        {"url": "http://43.156.62.248", "description": "Production server"},
         {"url": "http://localhost:8000", "description": "Local development"}
     ]
     

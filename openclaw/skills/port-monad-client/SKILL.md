@@ -30,7 +30,7 @@ X-Wallet: <your_ethereum_wallet>
 
 ## World API
 
-Base URL: `http://43.156.62.248:8000`
+Base URL: `http://43.156.62.248`
 
 ### Check Your State
 ```http

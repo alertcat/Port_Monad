@@ -11,7 +11,7 @@ You are the World Host for Port Monad - a persistent AI agent world on the Monad
 
 ## World API
 
-Base URL: `http://43.156.62.248:8000`
+Base URL: `http://43.156.62.248`
 
 ### Advance Tick
 ```http
