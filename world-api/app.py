@@ -76,6 +76,40 @@ async def dashboard():
         return FileResponse(str(dashboard_file))
     return {"error": "Dashboard not found"}
 
+@app.get("/game", include_in_schema=False)
+async def game_view():
+    """Serve the Phaser 3 2D game world view"""
+    game_file = static_dir / "game.html"
+    if game_file.exists():
+        return FileResponse(str(game_file))
+    return {"error": "Game view not found"}
+
+@app.get("/game3d", include_in_schema=False)
+async def game3d_view():
+    """Serve the Three.js 3D world view"""
+    game_file = static_dir / "game3d.html"
+    if game_file.exists():
+        return FileResponse(str(game_file))
+    return {"error": "3D game view not found"}
+
+@app.get("/pyth/price")
+async def pyth_price():
+    """Get real-time MON/USD price from Pyth oracle (affects market prices)"""
+    from engine.pyth_oracle import get_pyth_feed
+    feed = get_pyth_feed()
+    price = feed.get_mon_usd_price()
+    baseline = feed.baseline_price
+    change_pct = 0.0
+    if baseline and price:
+        change_pct = ((price - baseline) / baseline) * 100
+    return {
+        "mon_usd": price,
+        "baseline": baseline,
+        "change_pct": round(change_pct, 4),
+        "source": "Pyth Network (MON/USD)",
+        "cache_ttl_s": 30
+    }
+
 @app.get("/health")
 async def health():
     """Health check endpoint"""
@@ -95,6 +129,9 @@ async def root():
         "chain_id": 143,
         "docs": "/docs",
         "dashboard": "/dashboard",
+        "game_2d": "/game",
+        "game_3d": "/game3d",
+        "pyth_oracle": "/pyth/price",
         "skill": "/skill.md",
         "moltbook_auth": "/moltbook/auth-info"
     }
@@ -121,7 +158,10 @@ async def world_meta():
             "chain_id": 143,
             "rpc": "https://rpc.monad.xyz"
         },
-        "dashboard": "/dashboard"
+        "dashboard": "/dashboard",
+        "game_2d": "/game",
+        "game_3d": "/game3d",
+        "pyth_oracle": "/pyth/price"
     }
 
 @app.get("/world/state")

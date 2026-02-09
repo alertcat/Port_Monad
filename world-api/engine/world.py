@@ -296,8 +296,16 @@ class WorldEngine:
             # Event modifier
             event_mod = effects.get("price_modifier", 1.0)
             
-            # Calculate new price
-            new_price = current * supply_factor * noise * reversion * event_mod
+            # Pyth oracle modifier (real-time MON/USD affects prices)
+            try:
+                from engine.pyth_oracle import get_pyth_feed
+                pyth_effects = get_pyth_feed().get_price_effects()
+                pyth_mod = pyth_effects.get(resource, 1.0)
+            except Exception:
+                pyth_mod = 1.0
+            
+            # Calculate new price (supply * noise * reversion * events * oracle)
+            new_price = current * supply_factor * noise * reversion * event_mod * pyth_mod
             
             # Clamp
             new_price = max(3, min(50, int(round(new_price))))
