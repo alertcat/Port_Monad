@@ -122,6 +122,7 @@ async def demo_page():
 # Demo runner: judges can trigger full game from browser
 # ---------------------------------------------------------------------------
 import subprocess
+import sys
 import threading
 import time as _time
 
@@ -140,7 +141,7 @@ def _run_demo_background(rounds, cycles, cycle_wait):
     global _demo_state
     script = str(Path(__file__).parent.parent / "scripts" / "run_full_game.py")
     cmd = [
-        "python", script,
+        sys.executable, script,
         "--rounds", str(rounds),
         "--cycles", str(cycles),
         "--cycle-wait", str(cycle_wait),
