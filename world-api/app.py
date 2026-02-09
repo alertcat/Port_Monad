@@ -147,14 +147,18 @@ def _run_demo_background(rounds, cycles, cycle_wait):
         "--cycle-wait", str(cycle_wait),
     ]
     try:
+        env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            bufsize=1,
             encoding="utf-8",
             errors="replace",
             cwd=str(Path(__file__).parent.parent),
+            env=env,
         )
         with _demo_lock:
             _demo_state["pid"] = proc.pid

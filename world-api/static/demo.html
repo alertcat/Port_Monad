@@ -225,7 +225,7 @@ async function stopDemo() {
 
 function startPolling() {
   if (polling) clearInterval(polling);
-  polling = setInterval(pollLog, 1500);
+  polling = setInterval(pollLog, 800);
 }
 
 async function pollLog() {
